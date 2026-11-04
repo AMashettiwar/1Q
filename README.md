@@ -76,3 +76,7 @@ These signals cannot prove cheating. Fast readers, keyboard users and people wit
 ## Tone
 
 All mascot lines and every LLM prompt follow the same rules: light and wholesome humor only. No jokes about patients, suffering, death, politics, religion, or anyone's mistakes. Fallback lines are filtered against a banned-word list in tests.
+
+## Palette
+
+The colours come from a heritage wardrobe: deep teal and midnight navy lead, greens and warm neutrals support. Tokens live in `oneq/ui.py` (`THEMES`, `PALETTE`, `TOPIC_TONES`, `PERIOD_TONES`, `SECTION_TONES`, `OUTFIT_TONES`). Each tone has a light-theme and a dark-theme value, and `tests/test_palette.py` checks WCAG AA contrast for all of them.

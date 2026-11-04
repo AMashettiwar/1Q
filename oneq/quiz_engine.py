@@ -382,7 +382,7 @@ def standing(s, u: User, today: date) -> dict:
 # ---------------------------------------------------------------- progress (private to the user)
 def progress(s, u: User) -> dict:
     mm = mastery_map(s, u)
-    topics = [{"topic": SUBTOPICS[k], "level": round((v[0] - 700) / 200, 2)} for k, v in mm.items() if k in SUBTOPICS]
+    topics = [{"topic": SUBTOPICS[k], "key": k, "level": round(min(5.0, max(0.2, (v[0] - 600) / 200)), 2)} for k, v in mm.items() if k in SUBTOPICS]
     days = s.scalars(select(DailySet.day).where(DailySet.user_id == u.id, DailySet.completed.is_(True))).all()
     reviews = s.scalar(select(func.count()).select_from(ReviewItem).where(
         ReviewItem.user_id == u.id, ReviewItem.retired.is_(False)))

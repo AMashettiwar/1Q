@@ -7,6 +7,7 @@ import time
 from datetime import date, datetime
 from zoneinfo import ZoneInfo, available_timezones
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -42,8 +43,10 @@ def theme() -> str:
 
 def mascot(expr="happy", accessory=None, energy=100):
     if accessory is None or accessory == "":
-        accessory = "lab_coat" if theme() == "ivory" else ""
-    return avatar.svg(expr, accessory, energy, palette=ui.THEMES[theme()]["mascot"])
+        accessory = "lab_coat"
+    pal = ui.THEMES[theme()]["mascot"]
+    body = ui.OUTFIT_TONES.get(accessory, ui.OUTFIT_TONES[""])[1 if theme() == "ink" else 0]
+    return avatar.svg(expr, accessory, energy, palette=(body, pal[1], pal[2]))
 
 
 def say(text: str, expr: str = "happy"):
@@ -109,6 +112,7 @@ def sign_in() -> str | None:
 
 # ---------------------------------------------------------------- onboarding
 def onboarding(s, u: User):
+    st.markdown(ui.section("onboarding", "Onboarding", theme()), unsafe_allow_html=True)
     st.markdown(ui.hero(mascot("cheering"), "Welcome to 1Q",
                         "Tell me who you are at 1cell.ai and I will pitch the questions at the right level.",
                         "Takes 20 seconds. Then 5 quick placement questions."), unsafe_allow_html=True)
@@ -156,7 +160,7 @@ PROGRESS_LINES = [
     (0.34, "A third done. Your neurons are warming up nicely.", "thinking"),
     (0.5, "Halfway! I am doing a tiny cartwheel. Cells can do that.", "happy"),
     (0.75, "Three quarters. The finish line can see you.", "happy"),
-    (1.0, "All answered. Look them over if you like, then hit submit.", "cheering"),
+    (1.0, "All twelve done. Your review is below.", "cheering"),
 ]
 
 
@@ -188,6 +192,7 @@ def active_question(s, u: User, ds: DailySet) -> dict | None:
 
 
 def quiz_tab(s, u: User, ds: DailySet):
+    st.markdown(ui.section("quiz", "01 / Today's quiz", theme()), unsafe_allow_html=True)
     qs = json.loads(ds.questions_json)
     done = qe.answered_today(s, u, today())
     total = len(qs)
@@ -225,9 +230,9 @@ def quiz_tab(s, u: User, ds: DailySet):
 
     q = qs[idx]
     SS.setdefault("shown_at", {}).setdefault(q["id"], time.time())
-    chips = ui.chip(SUBTOPICS.get(q["subtopic"], q["subtopic"])) + ui.chip(adaptive.LEVEL_NAMES.get(q.get("level", 2), ""))
+    chips = ui.topic_tag(q["subtopic"], SUBTOPICS.get(q["subtopic"], q["subtopic"]), theme()) + ui.chip(adaptive.LEVEL_NAMES.get(q.get("level", 2), ""))
     chips += {"review": ui.chip("Rematch", "review"), "boss": ui.chip("Boss round", "boss"),
-              "wildcard": ui.chip("Wild card 🃏", "boss")}.get(q.get("kind"), "")
+              "wildcard": ui.chip("Wild card", "boss")}.get(q.get("kind"), "")
     st.markdown(f'<div class="oq-card">{chips}<div class="oq-eyebrow">Question {idx + 1} of {total}</div>'
                 f'<h3>{ui.esc(q["question"])}</h3></div>', unsafe_allow_html=True)
     choice = st.radio("Pick one", list(range(4)), format_func=lambda i: q["options"][i], index=None,
@@ -313,15 +318,17 @@ def results(s, u: User, ds: DailySet, qs):
                     f'<p><i>1Q: {ui.esc(line)}</i></p>{body}<p>{ui.esc(q["explanation"])}</p></div>', unsafe_allow_html=True)
     std = qe.standing(s, u, today())
     st.markdown("**Share your day** (streak and rank only, no scores):")
+    st.markdown(ui.share_html(u.display_name, u.streak, std["rank"], std["of"], u.title, today()), unsafe_allow_html=True)
     st.code(ui.share_card(u.display_name, u.streak, std["rank"], std["of"], u.title, today()), language=None)
     st.caption("That is today's one attempt. Come back tomorrow for new material and a reworded rematch of anything that tripped you up.")
 
 
 # ---------------------------------------------------------------- other tabs
 def leaderboard_tab(s, u: User):
+    st.markdown(ui.section("leaderboard", "02 / Leaderboard", theme()), unsafe_allow_html=True)
     std = qe.standing(s, u, today())
     arrow = "Up" if std["movement"] > 0 else "Down" if std["movement"] < 0 else "Holding,"
-    st.markdown(f'<div class="oq-card"><h3>Your standing: #{std["rank"]} of {std["of"]}</h3>'
+    st.markdown(f'<div class="oq-card toned" style="--c:{ui.tone('navy', theme())}"><h3>Your standing: #{std["rank"]} of {std["of"]}</h3>'
                 f'<p>{arrow} {abs(std["movement"])} since last time · {std["score"]:,} pts overall</p></div>',
                 unsafe_allow_html=True)
     views = st.tabs(["Daily", "Weekly", "Monthly", "Overall"])
@@ -329,15 +336,32 @@ def leaderboard_tab(s, u: User):
         with view:
             full = qe.leaderboard(s, today(), period)
             full = [r for r in full if r["score"] > 0] if period != "overall" else full
-            st.markdown(ui.podium(full[:3]), unsafe_allow_html=True)
+            st.markdown(ui.podium(full[:3], period, theme()), unsafe_allow_html=True)
             rows = qe.top_with_me(full, u.id, 10)[3:] if len(full) > 3 else []
             if u.id not in [r["user_id"] for r in full[:3] + rows] and period != "overall":
                 st.caption("You are not on this board yet. One finished set puts you on it.")
-            st.markdown(ui.lb_rows(rows, u.id), unsafe_allow_html=True)
+            st.markdown(ui.lb_rows(rows, u.id, period, theme()), unsafe_allow_html=True)
     st.caption("Score blends participation points, streak and mastery level. It never shows right or wrong counts.")
 
 
+def _style(chart):
+    t = ui.THEMES[theme()]
+    return chart.configure(background="transparent", font="Inter").configure_view(stroke=None).configure_axis(
+        labelColor=t["muted"], titleColor=t["muted"], gridColor=t["line"], domainColor=t["line2"], tickColor=t["line2"])
+
+
+def _mastery_chart(topics):
+    df = pd.DataFrame(topics)
+    df["color"] = [ui.tone(ui.TOPIC_TONES.get(k, "teal"), theme()) for k in df["key"]]
+    bars = alt.Chart(df).mark_bar(cornerRadiusEnd=3, height=14).encode(
+        x=alt.X("level:Q", title="Mastery level", scale=alt.Scale(domain=[0, 5])),
+        y=alt.Y("topic:N", title=None, sort="-x", axis=alt.Axis(labelLimit=220)),
+        color=alt.Color("color:N", scale=None), tooltip=["topic", "level"])
+    return _style(bars.properties(height=max(120, 28 * len(df))))
+
+
 def progress_tab(s, u: User):
+    st.markdown(ui.section("progress", "03 / My progress", theme()), unsafe_allow_html=True)
     p = qe.progress(s, u)
     c = st.columns(4)
     c[0].metric("Streak", f" {u.streak}")
@@ -346,13 +370,14 @@ def progress_tab(s, u: User):
     c[3].metric("Rematches queued", p["pending_reviews"])
     if p["topics"]:
         st.subheader("Topic mastery")
-        st.bar_chart(pd.DataFrame(p["topics"]).set_index("topic"), horizontal=True, height=320)
+        st.altair_chart(_mastery_chart(p["topics"]), width="stretch")
     else:
         st.caption("Your topic map fills in after your first set.")
     if p["days"]:
         st.subheader("Streak calendar")
         days = pd.DataFrame({"day": pd.to_datetime(p["days"]), "done": 1})
-        st.scatter_chart(days, x="day", y="done", height=140)
+        st.altair_chart(_style(alt.Chart(days).mark_circle(size=120, color=ui.tone("teal", theme())).encode(
+            x=alt.X("day:T", title=None), y=alt.Y("done:Q", axis=None)).properties(height=120)), width="stretch")
     st.subheader("Wardrobe and badges")
     owned = qe.unlocked(u)
     outfits = [""] + [k for k in avatar.ACCESSORIES if k and k in owned]
@@ -387,6 +412,7 @@ def progress_tab(s, u: User):
 
 
 def about_tab(s, u: User):
+    st.markdown(ui.section("about", "04 / About 1Q", theme()), unsafe_allow_html=True)
     st.markdown(f"""
 <div class="oq-card"><h3>Meet 1Q</h3>
 <p>1Q is your daily cancer-biology sparring partner. Every day you get {qe.DEFAULT_COUNT} questions, tuned to your role
@@ -404,13 +430,14 @@ outfits and titles. Fridays have a boss round.</p>
 
 
 def admin_tab(s):
+    st.markdown(ui.section("admin", "05 / Admin", theme()), unsafe_allow_html=True)
     a = qe.admin_stats(s, today())
     c = st.columns(3)
     c[0].metric("Users", a["users"])
     c[1].metric("Onboarded", a["onboarded"])
     c[2].metric("Finished today", a["today"])
     if a["by_day"]:
-        st.bar_chart(pd.DataFrame(a["by_day"]).set_index("day"))
+        st.bar_chart(pd.DataFrame(a["by_day"]).set_index("day"), color=ui.tone("slate", theme()))
     st.subheader("Soft integrity flags")
     st.caption("Heuristics only (very fast answers, machine-regular timing, copy/paste, tab switching). "
                "They cannot prove outside help. Use them to start a friendly conversation, nothing more.")
@@ -420,7 +447,7 @@ def admin_tab(s):
 
 # ---------------------------------------------------------------- chat
 def chat_panel(s, u: User, ds: DailySet):
-    st.markdown('<div class="oq-chat-head"> Ask 1Q</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="oq-chat-head" style="border-top:2px solid {ui.tone('peacock', theme())};padding-top:12px">Ask 1Q</div>', unsafe_allow_html=True)
     hist = SS.setdefault("chat", [{"role": "assistant", "content": f"Hi {u.display_name}! Ask me anything about cancer biology. "
                                    "I will not spoil a live quiz question though."}])
     box = st.container(height=300)
