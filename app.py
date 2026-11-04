@@ -628,19 +628,16 @@ def progress_tab(s, u: User):
         if p["topics"]:
             r1, r2 = st.columns(2, gap="medium")
             with r1:
-                card("radar", "Mastery radar", "Where you are strong").markdown(
+                card("radar", "Strengths", "Your 8 most-practised topics").markdown(
                     ui.radar(_radar_topics(p), th) or ui.empty("Three topics in and the radar draws itself.", "level"), unsafe_allow_html=True)
             with r2:
-                donut_chart(card("cov", "Topic coverage", "Share of your questions"))
-            r3, r4 = st.columns(2, gap="medium")
-            with r3:
-                card("mast", "Topic mastery", "Level 0 to 5 per topic").altair_chart(_mastery_chart(p["topics"]), width="stretch")
-            with r4:
-                c = card("cal", "Activity calendar", "Points per day")
-                if act["points"].sum() > 0:
-                    c.markdown(ui.heatmap(p["activity"], today()), unsafe_allow_html=True)
-                else:
-                    c.markdown(ui.empty("Your first set lights up today's square.", "flame"), unsafe_allow_html=True)
+                card("mast", "Mastery by topic", "Level 0 to 5, same topics").altair_chart(
+                    _mastery_chart(_radar_topics(p)), width="stretch")
+            c = card("cal", "Activity", "Points per day, last 18 weeks")
+            if act["points"].sum() > 0:
+                c.markdown(ui.heatmap(p["activity"], today()), unsafe_allow_html=True)
+            else:
+                c.markdown(ui.empty("Your first set lights up today's square.", "flame"), unsafe_allow_html=True)
         if len(lv) >= 2 or len(rk) >= 2:
             r5, r6 = st.columns(2, gap="medium")
             if len(lv) >= 2:
@@ -657,7 +654,7 @@ def progress_tab(s, u: User):
                 with r6:
                     c = card("rank", "Rank over time", f"Now #{int(rk['rank'].iloc[-1])}. Lower is higher")
                     rk["day"] = pd.to_datetime(rk["day"])
-                    spark = alt.Chart(rk).mark_line(interpolate="monotone", color=ui.tone("brass", th), strokeWidth=2.5,
+                    spark = alt.Chart(rk).mark_line(interpolate="linear", color=ui.tone("brass", th), strokeWidth=2.5,
                                                      point=alt.OverlayMarkDef(color=ui.tone("brass", th), size=36)).encode(
                         x=alt.X("day:T", title=None, axis=alt.Axis(format="%b %d", tickCount=5)),
                         y=alt.Y("rank:Q", title="Rank", scale=alt.Scale(reverse=True, zero=False), axis=alt.Axis(tickMinStep=1)))
