@@ -1,0 +1,537 @@
+"""1Q: a daily adaptive cancer-domain quiz for 1cell.ai."""
+from __future__ import annotations
+
+import json
+import random
+import time
+from datetime import date, datetime
+from zoneinfo import ZoneInfo, available_timezones
+
+import pandas as pd
+import streamlit as st
+
+from oneq import adaptive, auth, avatar, chat, llm, quiz_engine as qe, roles as roles_cfg, ui
+from oneq.db import session
+from oneq.models import DailySet, User
+from oneq.seed_questions import SUBTOPICS
+
+st.set_page_config(page_title="1Q · daily cancer quiz", page_icon=":material/biotech:", layout="centered")
+SS = st.session_state
+
+
+def _tz() -> ZoneInfo:
+    try:
+        return ZoneInfo(SS.get("tz") or "UTC")
+    except Exception:  # noqa: BLE001
+        return ZoneInfo("UTC")
+
+
+def now_local() -> datetime:
+    return datetime.now(_tz()).replace(tzinfo=None)
+
+
+def today() -> date:
+    """The quiz day resets at midnight in the user's own timezone."""
+    return now_local().date()
+
+
+def theme() -> str:
+    t = SS.get("theme", ui.DEFAULT_THEME)
+    return t if t in ui.THEMES else ui.DEFAULT_THEME
+
+
+def mascot(expr="happy", accessory=None, energy=100):
+    if accessory is None or accessory == "":
+        accessory = "lab_coat" if theme() == "ivory" else ""
+    return avatar.svg(expr, accessory, energy, palette=ui.THEMES[theme()]["mascot"])
+
+
+def say(text: str, expr: str = "happy"):
+    SS["avatar_msg"], SS["avatar_expr"] = text, expr
+
+
+# ---------------------------------------------------------------- sign-in
+def sign_in() -> str | None:
+    if SS.get("email"):
+        return SS["email"]
+    mode = auth.auth_mode()
+    st.markdown(ui.hero(mascot("happy"), "1Q", "Hi! I am 1Q. Sign in with your 1cell.ai email and let's grow some brain cells.",
+                        "Twelve questions a day. Built for 1cell.ai."), unsafe_allow_html=True)
+    st.write("")
+    if mode == "google":
+        g = auth.google_user()
+        if g:
+            SS["email"] = g
+            return g
+        if getattr(st.user, "is_logged_in", False):
+            st.error(f"That Google account is not a @{auth.allowed_domain()} address. Please use your work account.")
+            if st.button("Sign out"):
+                st.logout()
+            return None
+        if st.button("Sign in with Google", type="primary", width="stretch"):
+            st.login("google") if "google" in st.secrets.get("auth", {}) else st.login()
+        return None
+
+    email = st.text_input("Work email", placeholder=f"you@{auth.allowed_domain()}", key="login_email")
+    if mode == "demo":
+        st.caption("Demo mode: we only check the email domain. Anyone could type a colleague's address. "
+                   "Turn on Google sign-in or email codes before real use.")
+        if st.button("Enter 1Q", type="primary", width="stretch", key="login_btn"):
+            if auth.is_allowed_email(email):
+                SS["email"] = email.strip().lower()
+                st.rerun()
+            st.error(f"1Q is only open to @{auth.allowed_domain()} addresses.")
+        return None
+
+    # email_otp
+    if st.button("Email me a code", width="stretch", key="otp_send"):
+        if not auth.is_allowed_email(email):
+            st.error(f"1Q is only open to @{auth.allowed_domain()} addresses.")
+        else:
+            code, digest, exp = auth.new_otp()
+            try:
+                auth.send_email(email, "Your 1Q sign-in code", f"Your code is {code}. It expires in 10 minutes.\n\n1Q")
+                SS["otp"] = (email.strip().lower(), digest, exp)
+                st.success("Code sent. Check your inbox.")
+            except Exception as e:  # noqa: BLE001
+                st.error(f"Could not send the email: {e}")
+    if SS.get("otp"):
+        code = st.text_input("6-digit code", max_chars=6, key="otp_code")
+        if st.button("Verify", type="primary", key="otp_verify"):
+            em, digest, exp = SS["otp"]
+            if auth.check_otp(code, digest, exp):
+                SS["email"] = em
+                SS.pop("otp")
+                st.rerun()
+            st.error("That code did not match or it expired.")
+    return None
+
+
+# ---------------------------------------------------------------- onboarding
+def onboarding(s, u: User):
+    st.markdown(ui.hero(mascot("cheering"), "Welcome to 1Q",
+                        "Tell me who you are at 1cell.ai and I will pitch the questions at the right level.",
+                        "Takes 20 seconds. Then 5 quick placement questions."), unsafe_allow_html=True)
+    with st.form("onboard"):
+        name = st.text_input("Display name (shown on the leaderboard)", value=u.display_name)
+        role = st.selectbox("Your role at 1cell.ai", roles_cfg.role_names(), index=0)
+        other = st.text_input("If you picked Other, type your role", placeholder="e.g. Spatial omics specialist")
+        if st.form_submit_button("Start placement", type="primary", width="stretch"):
+            if role == roles_cfg.OTHER:
+                role = other.strip()[:60] or "Other"
+            qe.set_role(s, u, role, name)
+            SS["placement"] = {"results": [], "used": [], "level": adaptive.rating_to_level(u.base_rating)}
+            st.rerun()
+
+
+def placement(s, u: User):
+    P = SS.setdefault("placement", {"results": [], "used": [], "level": adaptive.rating_to_level(u.base_rating)})
+    n = len(P["results"])
+    if n >= 5:
+        qe.finish_placement(s, u, [tuple(r) for r in P["results"]])
+        SS.pop("placement")
+        say(f"Placement done. I set your starting level to {adaptive.LEVEL_NAMES[adaptive.rating_to_level(u.base_rating)]}. "
+            "It will move as you learn.", "cheering")
+        st.rerun()
+    if "pq" not in P:
+        P["pq"] = qe.placement_question(P["level"], set(P["used"]), random.Random())
+    q = P["pq"]
+    st.markdown(ui.hero(mascot("thinking", energy=90), "Quick placement",
+                        "No pressure. These just tell me where to start.", f"Question {n + 1} of 5"), unsafe_allow_html=True)
+    st.progress(n / 5)
+    st.markdown(f'<div class="oq-card"><h3>{ui.esc(q["question"])}</h3></div>', unsafe_allow_html=True)
+    choice = st.radio("Your answer", list(range(4)), format_func=lambda i: q["options"][i], index=None, key=f"pl_{n}")
+    if st.button("Next", type="primary", disabled=choice is None, key=f"pl_next_{n}"):
+        ok = qe.record_answer(s, u, q, choice, today(), placement=True)
+        P["results"].append([q["level"], ok])
+        P["used"].append(q["concept_id"])
+        P["level"] = adaptive.next_placement_level(P["level"], [ok])
+        P.pop("pq")
+        st.rerun()
+
+
+# ---------------------------------------------------------------- avatar
+PROGRESS_LINES = [
+    (0.01, "Great start. I am taking notes. Not on you, on the cells.", "thinking"),
+    (0.34, "A third done. Your neurons are warming up nicely.", "thinking"),
+    (0.5, "Halfway! I am doing a tiny cartwheel. Cells can do that.", "happy"),
+    (0.75, "Three quarters. The finish line can see you.", "happy"),
+    (1.0, "All answered. Look them over if you like, then hit submit.", "cheering"),
+]
+
+
+@st.fragment
+def avatar_panel(u_name: str, mood: dict, accessory: str, progress: float | None):
+    box = st.empty()
+    c1, c2 = st.columns([1, 3])
+    msg, expr = SS.get("avatar_msg") or mood["message"], SS.get("avatar_expr") or mood["expression"]
+    if progress:
+        for th, line, ex in PROGRESS_LINES:
+            if progress >= th:
+                msg, expr = line, ex
+    if c1.button("Poke 1Q", key="poke"):
+        SS["tickles"] = SS.get("tickles", 0) + 1
+        msg, expr = avatar.tickle_line(SS["tickles"])
+        if SS["tickles"] % len(avatar.TICKLE) == 0:
+            SS["tickles"] = 0
+    c2.caption(f"1Q says: {avatar.daily_pick(avatar.SAYS, today())}")
+    box.markdown(ui.hero(mascot(expr, accessory, mood["energy"]), avatar.greeting(u_name, now_local()), msg,
+                         f"1Q energy {mood['energy']}%"), unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------- quiz
+def active_question(s, u: User, ds: DailySet) -> dict | None:
+    if ds.completed:
+        return None
+    done = qe.answered_today(s, u, today())
+    return next((q for q in json.loads(ds.questions_json) if q["id"] not in done), None)
+
+
+def quiz_tab(s, u: User, ds: DailySet):
+    qs = json.loads(ds.questions_json)
+    done = qe.answered_today(s, u, today())
+    total = len(qs)
+    fb = SS.get("feedback")
+    idx = next((i for i, q in enumerate(qs) if q["id"] not in done), None)
+    if idx is None and not fb:
+        if not ds.completed:
+            finish_day(s, u)
+        return results(s, u, ds, qs)
+
+    st.markdown(ui.progress_ring(len(done), total), unsafe_allow_html=True)
+    if not done:
+        teaser_q, _ = avatar.daily_pick(avatar.TEASERS, today(), "teaser")
+        st.markdown(f'<div class="oq-note"> <b>Today\'s cliffhanger</b><br>{ui.esc(teaser_q)}<br>'
+                    '<small>Finish today\'s set to unlock the answer.</small></div>', unsafe_allow_html=True)
+        if any(q.get("kind") == "boss" for q in qs):
+            st.info(avatar.FRIDAY_BOSS)
+
+    if fb:
+        q, good = fb["q"], fb["correct"]
+        right = q["options"][q["answer_index"]]
+        if good:
+            body = f"<p> <b>{ui.esc(right)}</b></p><p>{ui.esc(q['explanation'])}</p>"
+        else:
+            body = (f"<p>You picked: {ui.esc(q['options'][fb['pick']])}</p><p> <b>Answer:</b> {ui.esc(right)}</p>"
+                    f"<p>{ui.esc(q['explanation'])}</p>")
+        st.markdown(f'<div class="oq-card {"good" if good else "kind"}"><div class="oq-eyebrow">'
+                    f'Q{fb["n"]} · locked in</div><h3>{ui.esc(fb["line"])}</h3>{body}</div>', unsafe_allow_html=True)
+        if st.button("Next question" if idx is not None else "See my review", type="primary",
+                     width="stretch", key="next_q"):
+            SS.pop("feedback")
+            SS.pop("avatar_msg", None)
+            st.rerun()
+        return
+
+    q = qs[idx]
+    SS.setdefault("shown_at", {}).setdefault(q["id"], time.time())
+    chips = ui.chip(SUBTOPICS.get(q["subtopic"], q["subtopic"])) + ui.chip(adaptive.LEVEL_NAMES.get(q.get("level", 2), ""))
+    chips += {"review": ui.chip("Rematch", "review"), "boss": ui.chip("Boss round", "boss"),
+              "wildcard": ui.chip("Wild card 🃏", "boss")}.get(q.get("kind"), "")
+    st.markdown(f'<div class="oq-card">{chips}<div class="oq-eyebrow">Question {idx + 1} of {total}</div>'
+                f'<h3>{ui.esc(q["question"])}</h3></div>', unsafe_allow_html=True)
+    choice = st.radio("Pick one", list(range(4)), format_func=lambda i: q["options"][i], index=None,
+                      key=f"ans_{q['id']}", label_visibility="collapsed")
+    c1, c2 = st.columns([3, 1])
+    if c2.button("Hint", key=f"hint_{q['id']}", width="stretch"):
+        SS.setdefault("hints", {})[q["id"]] = random.choice(avatar.HINTS)
+    if SS.get("hints", {}).get(q["id"]):
+        st.caption("1Q: " + SS["hints"][q["id"]])
+    if c1.button("Lock it in", type="primary", disabled=choice is None, width="stretch", key=f"submit_{q['id']}"):
+        elapsed = int((time.time() - SS["shown_at"][q["id"]]) * 1000)  # quiet anti-cheat signal, never shown
+        ok = qe.record_answer(s, u, q, choice, today(), elapsed)
+        SS.setdefault("times", []).append(elapsed)
+        SS.setdefault("results", []).append(ok)
+        try:
+            client = json.loads(SS.get("oneq_signals") or "{}")
+        except json.JSONDecodeError:
+            client = {}
+        prev = SS.get("prev_client", {})
+        delta = {k: client.get(k, 0) - prev.get(k, 0) for k in ("copy", "paste", "blur")}
+        SS["prev_client"] = client
+        nudge = qe.nudge_for(qe.integrity_signals(q["question"], elapsed, ok, SS["times"], SS["results"],
+                                                  q.get("level", 2), qe.overall_level(s, u), delta))
+        if nudge and not SS.get("flagged_today"):
+            SS["flagged_today"] = True
+            u.soft_flags += 1
+        rng = random.Random()
+        if ok:
+            line = avatar.role_line(u.role, "right") if rng.random() < .35 else avatar.pick(avatar.CORRECT)
+        else:
+            line = avatar.role_line(u.role, "wrong") if rng.random() < .35 else avatar.pick(avatar.WRONG)
+        SS["feedback"] = {"q": q, "correct": ok, "line": line, "pick": choice, "n": idx + 1}
+        if nudge:
+            say(nudge, "suspicious")
+        else:
+            say(line, "cheering" if ok else "oops")
+        st.rerun()
+
+
+def finish_day(s, u: User):
+    res = qe.complete_day(s, u, today(), honest=not SS.get("flagged_today"))
+    SS["finish"] = res
+    say(res["milestone"] or "Set complete! Your brain just did 12 reps. I am so proud I could divide.", "cheering")
+
+
+def results(s, u: User, ds: DailySet, qs):
+    res = SS.get("finish") or {}
+    if res and not SS.get("celebrated"):
+        SS["celebrated"] = True
+        if res.get("milestone") or (u.streak and u.streak % 7 == 0):
+            st.balloons()
+    _, teaser_a = avatar.daily_pick(avatar.TEASERS, today(), "teaser")
+    st.markdown(f'<div class="oq-card good"><h3>Today\'s set is done</h3>'
+                f'<p> Streak: <b>{u.streak}</b> · Shields: <b>{u.shields}</b> · Title: <b>{ui.esc(u.title)}</b></p>'
+                f'<p> <b>Cliffhanger solved:</b> {ui.esc(teaser_a)}</p></div>', unsafe_allow_html=True)
+    if res.get("shields_used"):
+        st.info(f" A streak shield covered {res['shields_used']} missed weekday(s). Streak saved.")
+    if res.get("shield_earned"):
+        st.success(" New streak shield earned. One free missed weekday is in your pocket.")
+    if res.get("drop"):
+        st.markdown(f'<div class="oq-note"> <b>Mystery drop:</b> {ui.esc(res["drop"]["text"])}</div>', unsafe_allow_html=True)
+    for un in res.get("unlocks", []):
+        st.success(f" Unlocked: {un}")
+    if res.get("honest_badge"):
+        st.success(" Honest Mode badge earned: five days of solo brainpower.")
+
+    st.subheader("Today's review")
+    done = qe.answered_today(s, u, today())
+    picks = {}
+    rng = random.Random(f"{u.id}{today()}")
+    for i, q in enumerate(qs):
+        ok = done.get(q["id"])
+        right = q["options"][q["answer_index"]]
+        if ok:
+            line = avatar.role_line(u.role, "right", rng) if rng.random() < .35 else avatar.pick(avatar.CORRECT, rng)
+            body = f"<p> {ui.esc(right)}</p>"
+        else:
+            line = avatar.role_line(u.role, "wrong", rng) if rng.random() < .35 else avatar.pick(avatar.WRONG, rng)
+            mine = picks.get(q["id"])
+            yours = f"<p>Your pick: {ui.esc(q['options'][mine])}</p>" if mine is not None else ""
+            body = f"{yours}<p> <b>Answer:</b> {ui.esc(right)}</p>"
+        st.markdown(f'<div class="oq-card {"good" if ok else "kind"}"><b>Q{i + 1}. {ui.esc(q["question"])}</b>'
+                    f'<p><i>1Q: {ui.esc(line)}</i></p>{body}<p>{ui.esc(q["explanation"])}</p></div>', unsafe_allow_html=True)
+    std = qe.standing(s, u, today())
+    st.markdown("**Share your day** (streak and rank only, no scores):")
+    st.code(ui.share_card(u.display_name, u.streak, std["rank"], std["of"], u.title, today()), language=None)
+    st.caption("That is today's one attempt. Come back tomorrow for new material and a reworded rematch of anything that tripped you up.")
+
+
+# ---------------------------------------------------------------- other tabs
+def leaderboard_tab(s, u: User):
+    std = qe.standing(s, u, today())
+    arrow = "Up" if std["movement"] > 0 else "Down" if std["movement"] < 0 else "Holding,"
+    st.markdown(f'<div class="oq-card"><h3>Your standing: #{std["rank"]} of {std["of"]}</h3>'
+                f'<p>{arrow} {abs(std["movement"])} since last time · {std["score"]:,} pts overall</p></div>',
+                unsafe_allow_html=True)
+    views = st.tabs(["Daily", "Weekly", "Monthly", "Overall"])
+    for view, period in zip(views, qe.PERIODS):
+        with view:
+            full = qe.leaderboard(s, today(), period)
+            full = [r for r in full if r["score"] > 0] if period != "overall" else full
+            st.markdown(ui.podium(full[:3]), unsafe_allow_html=True)
+            rows = qe.top_with_me(full, u.id, 10)[3:] if len(full) > 3 else []
+            if u.id not in [r["user_id"] for r in full[:3] + rows] and period != "overall":
+                st.caption("You are not on this board yet. One finished set puts you on it.")
+            st.markdown(ui.lb_rows(rows, u.id), unsafe_allow_html=True)
+    st.caption("Score blends participation points, streak and mastery level. It never shows right or wrong counts.")
+
+
+def progress_tab(s, u: User):
+    p = qe.progress(s, u)
+    c = st.columns(4)
+    c[0].metric("Streak", f" {u.streak}")
+    c[1].metric("Best streak", u.best_streak)
+    c[2].metric("Shields", f" {u.shields}")
+    c[3].metric("Rematches queued", p["pending_reviews"])
+    if p["topics"]:
+        st.subheader("Topic mastery")
+        st.bar_chart(pd.DataFrame(p["topics"]).set_index("topic"), horizontal=True, height=320)
+    else:
+        st.caption("Your topic map fills in after your first set.")
+    if p["days"]:
+        st.subheader("Streak calendar")
+        days = pd.DataFrame({"day": pd.to_datetime(p["days"]), "done": 1})
+        st.scatter_chart(days, x="day", y="done", height=140)
+    st.subheader("Wardrobe and badges")
+    owned = qe.unlocked(u)
+    outfits = [""] + [k for k in avatar.ACCESSORIES if k and k in owned]
+    pick = st.selectbox("1Q outfit", outfits, index=outfits.index(u.equipped) if u.equipped in outfits else 0,
+                        format_func=lambda k: avatar.ACCESSORY_NAMES.get(k, "None"))
+    if pick != u.equipped:
+        u.equipped = pick
+    badges = [b for b in owned if b not in avatar.ACCESSORIES]
+    st.write("Badges: " + (", ".join(b.replace("_", " ").title() for b in badges) if badges else "none yet. Keep going."))
+    st.subheader("Settings")
+    names = roles_cfg.role_names()
+    cur = u.role if u.role in names else roles_cfg.OTHER
+    new_role = st.selectbox("Your role (change any time)", names, index=names.index(cur), key="set_role")
+    if new_role == roles_cfg.OTHER:
+        new_role = st.text_input("Type your role", value=u.role if cur == roles_cfg.OTHER else "", key="set_role_other").strip()[:60] or u.role
+    if new_role != u.role:
+        qe.set_role(s, u, new_role)
+        st.toast("Role updated. Your mastery history stays as it is.")
+    zones = sorted(available_timezones())
+    tz_now = u.timezone or SS.get("tz") or "UTC"
+    tz = st.selectbox("Timezone (your day resets at local midnight)", zones,
+                      index=zones.index(tz_now) if tz_now in zones else zones.index("UTC"), key="set_tz")
+    if tz != u.timezone:
+        u.timezone, SS["tz"] = tz, tz
+        SS["tz_manual"] = True
+        st.toast(f"Timezone set to {tz}.")
+    rem = st.toggle("Daily reminder email", value=u.reminder_opt_in,
+                    help="1Q emails you once a day if you have not quizzed yet. Turn off any time.")
+    if rem != u.reminder_opt_in:
+        u.reminder_opt_in = rem
+        st.toast("Reminder settings saved.")
+
+
+def about_tab(s, u: User):
+    st.markdown(f"""
+<div class="oq-card"><h3>Meet 1Q</h3>
+<p>1Q is your daily cancer-biology sparring partner. Every day you get {qe.DEFAULT_COUNT} questions, tuned to your role
+and to how you are doing on each topic. About 70% is new material and 30% is a rematch of things you missed,
+reworded so you are learning the idea and not memorizing a sentence.</p>
+<p>Miss a question and it comes back tomorrow, then in 3 days, then in 7. Get it right each time and it retires.</p>
+<p>Streaks earn shields (one per 7 days) so a sick day does not wipe you out. Finish a set for mystery drops,
+outfits and titles. Fridays have a boss round.</p>
+<p>The leaderboard ranks by points, streak and mastery level. Nobody sees your right or wrong counts. Not even me. Okay, I see them, but I am a cartoon.</p>
+</div>""", unsafe_allow_html=True)
+    word = st.text_input("Whisper something to 1Q", key="whisper", placeholder="psst...")
+    if word:
+        st.info(avatar.KEYWORDS.get(word.strip().lower(), "Hmm. Not a secret word. Try something every biologist loves."))
+    st.caption(f"Questions by: {'AI + seed bank' if llm.get_provider().available() else 'built-in seed bank'} · Sign-in: {auth.auth_mode()}")
+
+
+def admin_tab(s):
+    a = qe.admin_stats(s, today())
+    c = st.columns(3)
+    c[0].metric("Users", a["users"])
+    c[1].metric("Onboarded", a["onboarded"])
+    c[2].metric("Finished today", a["today"])
+    if a["by_day"]:
+        st.bar_chart(pd.DataFrame(a["by_day"]).set_index("day"))
+    st.subheader("Soft integrity flags")
+    st.caption("Heuristics only (very fast answers, machine-regular timing, copy/paste, tab switching). "
+               "They cannot prove outside help. Use them to start a friendly conversation, nothing more.")
+    st.dataframe(pd.DataFrame(a["flagged"]) if a["flagged"] else pd.DataFrame(columns=["name", "email", "soft_flags"]),
+                 hide_index=True, width="stretch")
+
+
+# ---------------------------------------------------------------- chat
+def chat_panel(s, u: User, ds: DailySet):
+    st.markdown('<div class="oq-chat-head"> Ask 1Q</div>', unsafe_allow_html=True)
+    hist = SS.setdefault("chat", [{"role": "assistant", "content": f"Hi {u.display_name}! Ask me anything about cancer biology. "
+                                   "I will not spoil a live quiz question though."}])
+    box = st.container(height=300)
+    for m in hist[-12:]:
+        box.chat_message(m["role"], avatar=":material/blur_on:" if m["role"] == "assistant" else ":material/person:").write(m["content"])
+    with st.form("chat_form", clear_on_submit=True, border=False):
+        msg = st.text_input("Message 1Q", placeholder="e.g. explain CAR-T like I am an intern",
+                            label_visibility="collapsed", key="chat_msg")
+        sent = st.form_submit_button("Send", width="stretch", key="chat_send")
+    if sent and msg.strip():
+        if SS.get("feedback"):
+            active = None  # just answered: free to discuss
+        else:
+            active = active_question(s, u, ds)
+        hist.append({"role": "user", "content": msg.strip()[:500]})
+        if not chat.RateLimiter(SS).allow():
+            ans = chat.SLOW_DOWN
+        else:
+            ans = chat.reply(hist[:-1], msg, u.display_name, u.role, active)
+        hist.append({"role": "assistant", "content": ans})
+        st.rerun()
+
+
+# ---------------------------------------------------------------- main
+def main():
+    st.markdown(ui.css(theme()), unsafe_allow_html=True)
+    email = sign_in()
+    if not email:
+        return
+    with session() as s:
+        u = qe.get_or_create_user(s, email)
+        if not u.timezone:
+            detected = getattr(st.context, "timezone", None)  # browser timezone
+            if detected:
+                u.timezone = detected
+        SS["tz"] = u.timezone or "UTC"
+        if "theme" not in SS:
+            SS["theme"] = u.theme or ui.DEFAULT_THEME
+            st.rerun()
+        now = now_local()
+        if "days_away" not in SS:
+            SS["days_away"] = (today() - u.last_completed).days if u.last_completed else None
+            SS["last_action"] = time.time()
+        u.last_seen = now
+        if not u.role:
+            return onboarding(s, u)
+        if not u.placement_done:
+            return placement(s, u)
+
+        if time.time() - SS.get("last_action", time.time()) > 300 and not SS.get("idle_shown"):
+            SS["idle_shown"] = True
+            say(avatar.IDLE, "sleepy")
+        SS["last_action"] = time.time()
+
+        ds = qe.get_today_set(s, u, today())
+        if "greeted" not in SS:
+            SS["greeted"] = True
+            if (SS["days_away"] or 0) >= 2:
+                say(f"Welcome back, {u.display_name}! I saved your seat. Comebacks are my favorite genre.", "cheering")
+            elif 0 <= now.hour < 5:
+                say(avatar.MIDNIGHT, "sleepy")
+            else:
+                ln = llm.avatar_line(f"Greeting a {u.role} with a {u.streak}-day streak", u.display_name)
+                say(ln or avatar.role_line(u.role, "greet"), "happy")
+        mood = avatar.mood(u.streak, SS["days_away"], now, ds.completed)
+
+        with st.sidebar:
+            st.markdown(f"### {u.display_name}")
+            st.caption(f"{u.role} · {u.title}")
+            st.metric("Streak", f" {u.streak}", help="Days in a row with a finished set")
+            st.metric("Level", adaptive.LEVEL_NAMES[qe.overall_level(s, u)])
+            st.metric("Streak shields", f" {u.shields}")
+            n_q = len(json.loads(ds.questions_json))
+            n_ans = len(qe.answered_today(s, u, today()))
+            st.progress(1.0 if ds.completed else n_ans / n_q,
+                        text="Today's set: done" if ds.completed else f"Today: {n_ans} of {n_q}")
+            chat_panel(s, u, ds)
+            dark = st.toggle("Dark theme", value=theme() == "ink", key="theme_toggle")
+            if (dark and theme() != "ink") or (not dark and theme() != "ivory"):
+                SS["theme"] = u.theme = "ink" if dark else "ivory"
+                st.rerun()
+            if st.button("Sign out", key="signout"):
+                SS.clear()
+                if auth.auth_mode() == "google":
+                    st.logout()
+                st.rerun()
+
+        qs_today = json.loads(ds.questions_json)
+        n_done = len(qe.answered_today(s, u, today()))
+        prog = None if ds.completed else n_done / len(qs_today)
+        avatar_panel(u.display_name, mood, u.equipped, prog)
+        with st.container(key="oneq_hidden"):
+            st.text_input("signals", key="oneq_signals", label_visibility="collapsed")
+        st.html(ui.SIGNALS_JS, unsafe_allow_javascript=True)
+
+        names = ["Today's Quiz", "Leaderboard", "My Progress", "About 1Q"]
+        admin = auth.is_admin(email)
+        if admin:
+            names.append("Admin")
+        tabs = st.tabs(names)
+        with tabs[0]:
+            quiz_tab(s, u, ds)
+        with tabs[1]:
+            leaderboard_tab(s, u)
+        with tabs[2]:
+            progress_tab(s, u)
+        with tabs[3]:
+            about_tab(s, u)
+        if admin:
+            with tabs[4]:
+                admin_tab(s)
+
+
+main()
