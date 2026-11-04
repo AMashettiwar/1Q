@@ -316,14 +316,45 @@ def quiz_tab(s, u: User, ds: DailySet):
         return results(s, u, ds, qs)
 
     bar = "".join(f'<i class="{"on" if i < len(done) else "now" if i == len(done) and not fb else ""}"></i>' for i in range(total))
-    with st.container(key="quiz_col"):
-        st.markdown(f'<div class="oq-qtop"><div class="oq-qhead">{ui.progress_ring(len(done), total)}</div>'
-                    f'<div class="oq-qbar" aria-hidden="true">{bar}</div></div>', unsafe_allow_html=True)
-        cstage, cmain = st.columns([1, 2.4], gap="medium")
-        with cstage:
+    lay = mascot_layout()
+    top = (f'<div class="oq-qtop"><div class="oq-qhead">{ui.progress_ring(len(done), total)}</div>'
+           f'<div class="oq-qbar" aria-hidden="true">{bar}</div></div>')
+    with st.container(key="quiz_col"), st.container(key=f"ml_{lay}"):
+        if lay == "a":  # slim banner row above the question
+            st.markdown(top, unsafe_allow_html=True)
             quiz_stage(u, qs, done, fb, idx)
-        with cmain:
             _quiz_body(s, u, qs, done, total, fb, idx)
+        elif lay == "b":  # docked bottom-right, bubble pops up above it
+            st.markdown(top, unsafe_allow_html=True)
+            _quiz_body(s, u, qs, done, total, fb, idx)
+            quiz_stage(u, qs, done, fb, idx)
+        elif lay == "c":  # inline in the header row next to the progress bar
+            c1, c2 = st.columns([1, 1.5], gap="medium", vertical_alignment="center")
+            c1.markdown(top, unsafe_allow_html=True)
+            with c2:
+                quiz_stage(u, qs, done, fb, idx)
+            _quiz_body(s, u, qs, done, total, fb, idx)
+        elif lay == "d":  # to the right of the question card
+            st.markdown(top, unsafe_allow_html=True)
+            cmain, cstage = st.columns([2.4, 1], gap="medium")
+            with cmain:
+                _quiz_body(s, u, qs, done, total, fb, idx)
+            with cstage:
+                quiz_stage(u, qs, done, fb, idx)
+        else:  # current: sticky stage left of the question
+            st.markdown(top, unsafe_allow_html=True)
+            cstage, cmain = st.columns([1, 2.4], gap="medium")
+            with cstage:
+                quiz_stage(u, qs, done, fb, idx)
+            with cmain:
+                _quiz_body(s, u, qs, done, total, fb, idx)
+
+
+def mascot_layout() -> str:
+    """Temporary switch for trying mascot placements: ?ml=a|b|c|d or MASCOT_LAYOUT; default is the current one."""
+    from oneq import config
+    v = str(st.query_params.get("ml") or config.get("MASCOT_LAYOUT", "") or "").lower()
+    return v if v in ("a", "b", "c", "d") else "cur"
 
 
 def quiz_stage(u: User, qs, done, fb, idx):
@@ -392,7 +423,7 @@ def _quiz_body(s, u: User, qs, done, total, fb, idx):
                 f'<h3>{ui.esc(q["question"])}</h3></div>', unsafe_allow_html=True)
     choice = st.radio("Pick one", list(range(4)), format_func=lambda i: q["options"][i], index=None,
                       key=f"ans_{q['id']}", label_visibility="collapsed")
-    c1, c2 = st.columns([3, 1])
+    c1, c2 = st.container(key="lockrow").columns([3, 1])
     if c2.button("Hint", key=f"hint_{q['id']}", width="stretch"):
         SS.setdefault("hints", {})[q["id"]] = random.choice(avatar.HINTS)
     if SS.get("hints", {}).get(q["id"]):

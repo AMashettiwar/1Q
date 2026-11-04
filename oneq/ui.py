@@ -412,6 +412,44 @@ section[data-testid="stSidebar"] .oq-stat .v { font-size:clamp(16px,1.4vw,20px);
   .oq-qstage .fig, .oq-qstage .fig svg { width:72px; height:72px; flex:none; }
   .oq-sbubble { margin-top:0; font-size:13.5px; padding:10px 12px; } .oq-sbubble::before { top:50%; left:-7px; margin:-6px 0 0; transform:rotate(-45deg); }
   .st-key-quiz_stage .stButton, .oq-tease { display:none; } .oq-slim .g { font-size:23px; } .oq-slim span { display:none; } }
+/* ---- mascot layout variants (?ml=a|b|c|d) ---- */
+[class*="st-key-ml_"] { gap:8px; }
+.st-key-ml_a .st-key-quiz_stage, .st-key-ml_c .st-key-quiz_stage { position:static; }
+.st-key-ml_a .oq-qstage, .st-key-ml_c .oq-qstage, .st-key-ml_b .oq-qstage { flex-direction:row; text-align:left; gap:12px; align-items:center; }
+.st-key-ml_a .oq-qstage .fig, .st-key-ml_a .oq-qstage .fig svg { width:84px; height:84px; flex:none; }
+.st-key-ml_c .oq-qstage .fig, .st-key-ml_c .oq-qstage .fig svg { width:68px; height:68px; flex:none; }
+.st-key-ml_a .oq-sbubble, .st-key-ml_c .oq-sbubble { margin-top:0; flex:1; }
+.st-key-ml_a .oq-sbubble::before, .st-key-ml_c .oq-sbubble::before { top:50%; left:-7px; margin:-6px 0 0; transform:rotate(-45deg); }
+.st-key-ml_a .oq-tease, .st-key-ml_b .oq-tease, .st-key-ml_c .oq-tease,
+.st-key-ml_a .st-key-quiz_stage .stButton, .st-key-ml_b .st-key-quiz_stage .stButton, .st-key-ml_c .st-key-quiz_stage .stButton { display:none; }
+.st-key-ml_a .st-key-quiz_stage { padding:6px 4px; }
+.st-key-ml_b .st-key-quiz_stage { position:fixed; right:28px; bottom:24px; top:auto; width:300px; z-index:60; }
+.st-key-ml_b .oq-qstage { flex-direction:column-reverse; align-items:flex-end; text-align:left; gap:6px; }
+.st-key-ml_b .oq-qstage .fig, .st-key-ml_b .oq-qstage .fig svg { width:104px; height:104px; }
+.st-key-ml_b .oq-sbubble { margin:0; }
+.st-key-ml_b .oq-sbubble::before { top:auto; bottom:-7px; left:auto; right:46px; transform:rotate(225deg); }
+@media (min-width:641px) and (max-width:1500px) { .st-key-ml_b .st-key-quiz_col, .st-key-ml_b { padding-right:0; } }
+.st-key-ml_d .st-key-quiz_stage { position:sticky; top:64px; }
+@media (max-width:640px) {
+  .block-container { padding:8px 14px 24px !important; }
+  .st-key-quiz_col .oq-qtop .oq-qhead small, .st-key-quiz_col .oq-kbd { display:none; }
+  .st-key-quiz_col .oq-card { padding:12px 14px; margin:0 0 6px; }
+  .st-key-quiz_col .oq-card h3 { font-size:17px !important; margin:4px 0 0 !important; }
+  .st-key-quiz_col div[role="radiogroup"] label { padding:8px 12px !important; font-size:15px; }
+  .st-key-quiz_col .oq-opts { gap:5px; margin:8px 0 2px; } .st-key-quiz_col .oq-opt { padding:7px 10px; font-size:14px; }
+  .st-key-quiz_col .oq-explain { margin-top:8px; padding:8px 12px; font-size:13.5px; }
+  .st-key-lockrow [data-testid="stHorizontalBlock"] { flex-wrap:nowrap !important; gap:8px; }
+  .st-key-lockrow [data-testid="stColumn"] { min-width:0 !important; width:auto !important; }
+  .st-key-lockrow [data-testid="stColumn"]:first-child { flex:3 1 0 !important; } .st-key-lockrow [data-testid="stColumn"]:last-child { flex:1 1 0 !important; }
+  .st-key-ml_b .st-key-quiz_stage { position:static; width:auto; order:1; }
+  .st-key-ml_b > *:has(.oq-qtop) { order:0; } .st-key-ml_b > * { order:2; } .st-key-ml_b > .st-key-quiz_stage, .st-key-ml_b > *:has(> .st-key-quiz_stage) { order:1; }
+  .st-key-ml_b .oq-qstage { flex-direction:row; align-items:center; }
+  .st-key-ml_b .oq-sbubble::before { top:50%; bottom:auto; left:-7px; right:auto; margin:-6px 0 0; transform:rotate(-45deg); }
+  [class*="st-key-ml_"] .oq-qstage .fig, [class*="st-key-ml_"] .oq-qstage .fig svg { width:56px !important; height:56px !important; }
+  .oq-sbubble { font-size:13px; padding:8px 10px; }
+  .oq-slim .g { font-size:20px; }
+  div[role="tablist"] { padding:2px; } div[role="tablist"] button { padding:6px 10px !important; min-height:0 !important; }
+}
 @media (max-width:1024px) { .block-container { padding:32px 28px 88px; }
   [class*="st-key-grid_"] > div > [data-testid="stHorizontalBlock"], [class*="st-key-grid_"] [data-testid="stHorizontalBlock"] { flex-direction:column; flex-wrap:wrap; }
   [class*="st-key-grid_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] { width:100% !important; flex:1 1 100% !important; min-width:100% !important; }
