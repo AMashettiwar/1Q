@@ -48,25 +48,41 @@ ACCESSORY_NAMES = {
 }
 
 
+REACTIONS = {"cheering": "joy", "oops": "empathy", "thinking": "think", "sleepy": "sleep", "missing": "sleep",
+             "ticklish": "shake", "suspicious": "squint", "happy": "idle"}
+
+
 def svg(expression: str = "happy", accessory: str = "", energy: int = 100, size: int = 104,
-        palette: tuple = ("#1f3d2b", "#f4efe4", "#a8874a")) -> str:
+        palette: tuple = ("#0f5257", "#f4efe4", "#a8874a"), react_id: int = 0) -> str:
+    """1Q as layered parts so the front end can animate it: orbit, body (squash and stretch),
+    face (tracks the pointer), eyes (blink), mouth (talks), a brass burst for joy and Zs for sleep."""
     body, eye, brass = palette
     e = expression if expression in _EYES else "happy"
-    op = 0.55 + 0.45 * max(0, min(100, energy)) / 100
-    anim = {"cheering": "oneq-bounce", "ticklish": "oneq-wiggle", "sleepy": "oneq-breathe",
-            "missing": "oneq-breathe"}.get(e, "oneq-float")
+    op = 0.62 + 0.38 * max(0, min(100, energy)) / 100
     fill = lambda t: t.replace("{eye}", eye).replace("{brass}", brass)
+    burst = "".join(
+        f'<line x1="{60 + 48 * c:.1f}" y1="{60 + 48 * s_:.1f}" x2="{60 + 56 * c:.1f}" y2="{60 + 56 * s_:.1f}"/>'
+        for c, s_ in [(1, 0), (.5, .866), (-.5, .866), (-1, 0), (-.5, -.866), (.5, -.866)])
     return (
-        f'<svg class="oneq-avatar {anim}" width="{size}" height="{size}" viewBox="0 -6 120 126" role="img" '
-        f'aria-label="1Q, {e}" xmlns="http://www.w3.org/2000/svg">'
-        f'<g class="oneq-orbit"><ellipse cx="60" cy="60" rx="54" ry="20" fill="none" stroke="{brass}" stroke-width="1.2" '
-        f'stroke-opacity=".55" transform="rotate(-18 60 60)"/><circle cx="111" cy="47" r="2.6" fill="{brass}"/></g>'
+        f'<svg class="oneq-avatar" data-react="{REACTIONS.get(e, "idle")}" data-rid="{react_id}" data-expr="{e}" '
+        f'width="{size}" height="{size}" viewBox="-8 -14 136 140" role="img" aria-label="1Q, {e}" '
+        f'xmlns="http://www.w3.org/2000/svg">'
+        f'<ellipse class="m-shadow" cx="60" cy="116" rx="26" ry="3.5" fill="{body}" opacity=".16"/>'
+        f'<g class="m-orbit"><ellipse cx="60" cy="60" rx="56" ry="20" fill="none" stroke="{brass}" stroke-width="1.2" '
+        f'stroke-opacity=".6" transform="rotate(-18 60 60)"/><circle cx="113" cy="46" r="2.6" fill="{brass}"/></g>'
+        f'<g class="m-rig"><g class="m-body">'
         f'<circle cx="60" cy="60" r="40" fill="{body}" opacity="{op:.2f}"/>'
-        f'<circle cx="60" cy="60" r="40" fill="none" stroke="{brass}" stroke-opacity=".35"/>'
-        f'<circle cx="78" cy="38" r="8" fill="{eye}" opacity=".10"/>'
-        f'<g stroke="{eye}" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">'
-        f'<g class="blink">{fill(_EYES[e])}</g>{fill(_MOUTH[e])}</g>'
-        f'{fill(ACCESSORIES.get(accessory, ""))}</svg>'
+        f'<circle cx="60" cy="60" r="40" fill="none" stroke="{brass}" stroke-opacity=".45"/>'
+        f'<circle cx="78" cy="38" r="8" fill="{eye}" opacity=".12"/>'
+        f'<path d="M34 44 q8 -14 22 -18" fill="none" stroke="{eye}" stroke-opacity=".16" stroke-width="2" stroke-linecap="round"/>'
+        f'<g class="m-face" stroke="{eye}" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">'
+        f'<g class="m-eyes">{fill(_EYES[e])}</g><g class="m-mouth">{fill(_MOUTH[e])}</g>'
+        f'<g class="m-cheeks" stroke="none" fill="{brass}" opacity="0"><circle cx="38" cy="66" r="4"/><circle cx="82" cy="66" r="4"/></g></g>'
+        f'{fill(ACCESSORIES.get(accessory, ""))}</g></g>'
+        f'<g class="m-burst" stroke="{brass}" stroke-width="2.2" stroke-linecap="round">{burst}</g>'
+        f'<g class="m-z" fill="{brass}" font-family="Fraunces, Georgia, serif" font-size="14">'
+        f'<text x="94" y="20">z</text><text x="104" y="6" font-size="10">z</text></g>'
+        f'</svg>'
     )
 
 
@@ -234,7 +250,10 @@ def mood(streak: int, days_away: int | None, now: datetime, done_today: bool) ->
 
 def greeting(name: str, now: datetime) -> str:
     h = now.hour
-    part = "Good morning" if 5 <= h < 12 else "Good afternoon" if h < 17 else "Good evening" if h < 23 else "Hello, night owl"
+    if h < 5 or h >= 23:
+        part = "Hello, night owl"
+    else:
+        part = "Good morning" if h < 12 else "Good afternoon" if h < 17 else "Good evening"
     return f"{part}, {name}."
 
 
@@ -245,32 +264,45 @@ def roll_mystery(rng: random.Random, owned: list[str]) -> tuple[str, str, str]:
 
 # ---------------------------------------------------------------- role flavor
 def role_group(role: str | None) -> str:
-    r = (role or "").lower()
-    if any(k in r for k in ("comput", "bioinform", "data", "machine learning", "software", "devops")):
-        return "comp"
-    if any(k in r for k in ("intern", "student", "co-op", "technician", "assistant", "business", "ops",
-                            "manager", "sales", "marketing", "finance", "legal", "hr")):
-        return "starter"
-    if any(k in r for k in ("phd", "postdoc", "principal", "director", "head", "pathologist", "md",
-                            "medical", "executive", "founder", "senior scientist")):
-        return "phd"
-    if any(k in r for k in ("wet", "research associate", "histo", "scientist", "quality", "clinical", "lab")):
-        return "wetlab"
-    return "starter"
+    """Line-bank key for any role, via the generic profile in persona.py."""
+    from . import persona
+    return persona.bucket(persona.profile(role))
+
+
 
 
 ROLE_LINES = {
-    "starter": {
+    "intern": {
         "greet": ["Intern energy detected. Curious, caffeinated, unstoppable.",
                   "Every senior scientist started exactly where you are. You are in great company."],
+        "first": "First day with me? I will go easy. Mostly. Cells have a sense of humor.",
+        "back": "Back again! At this rate you will be mentoring the next intern.",
+        "night": "Late-night intern study session? Legendary. I brought imaginary snacks.",
+        "streak": "{n} days straight. Your onboarding doc is getting jealous.",
         "right": ["Look at you, out-learning your onboarding doc.", "Rookie? Not today."],
         "wrong": ["Great attempt. This one shows up in PhD qualifiers.",
                   "You just learned something lots of scientists had to look up once."],
         "remind": "Your brain cells signed up for 12 reps today",
     },
+    "tech": {
+        "greet": ["Build passed. Now let's compile some biology.",
+                  "Think of a cell as a very old codebase with no comments. Let's read it."],
+        "first": "Hello, engineer. DNA is just a 4-letter encoding with very strict code review.",
+        "back": "Welcome back. Your knowledge cache is warm and ready.",
+        "night": "Late-night deploy and a late-night quiz? Respect. Hydrate like a well-tuned server.",
+        "streak": "{n}-day streak. That is better uptime than most staging servers.",
+        "right": ["All tests green.", "Merged on the first review."],
+        "wrong": ["Nice reasoning. Here is the one config flag that flips it.",
+                  "Edge case found. Here is the patch."],
+        "remind": "git pull today's 1Q, it has 12 new commits",
+    },
     "wetlab": {
         "greet": ["Gloves on, brain on. Today's protocol takes 4 minutes, no incubation.",
                   "No pipette calibration needed for this one. I promise."],
+        "first": "Welcome to the bench, digital edition. No gloves required.",
+        "back": "You came back! Like a perfectly reproducible result.",
+        "night": "Night shift at the bench? Your cells are asleep. Your brain, apparently, is not.",
+        "streak": "{n} days in a row. More consistent than any incubator I know.",
         "right": ["Cleaner than a single band on a Western.", "That answer passed QC on the first run."],
         "wrong": ["Good thinking at the bench. Here is the result that holds up.",
                   "Every protocol gets a second run. Here is the version that works."],
@@ -279,6 +311,10 @@ ROLE_LINES = {
     "comp": {
         "greet": ["Your pipeline is green. Time to run the human model.",
                   "No conda environment needed. Just your neurons."],
+        "first": "New sample loaded. Let's estimate your priors.",
+        "back": "Welcome back. Your model has been retrained on fresh data.",
+        "night": "Jobs queued, cluster humming, and you are here with me. Nice.",
+        "streak": "{n}-day streak. Statistically significant.",
         "right": ["Converged on the first epoch.", "That answer had zero NaNs."],
         "wrong": ["Nice reasoning. Here is the one extra data point that flips it.",
                   "Your prior was reasonable. Here is the posterior update."],
@@ -287,12 +323,137 @@ ROLE_LINES = {
     "phd": {
         "greet": ["Doctor, your daily peer review is ready. Reviewer 2 is on vacation.",
                   "Talk shop with me. I brought mechanisms."],
+        "first": "Doctor, welcome. I skipped the textbook chapter and went straight to mechanisms.",
+        "back": "Welcome back, Doctor. Your committee would approve of this consistency.",
+        "night": "Midnight science, the classic PhD move. I will keep the questions sharp.",
+        "streak": "{n} days straight. That is a publishable trend.",
         "right": ["Accepted without revisions.", "Your committee would nod slowly at that one."],
         "wrong": ["Great hypothesis. The evidence points the other way, here is the story.",
                   "This one is subtle even for experts. Here is the mechanism."],
         "remind": "Today's set has a mechanism you will want to argue about",
     },
+    "cto": {
+        "greet": ["CTO on deck. Today's roadmap: twelve questions, zero tech debt.",
+                  "Let's architect some biology. I promise the diagrams are cuter."],
+        "first": "Welcome, CTO. Think of me as a very small platform team for your science knowledge.",
+        "back": "Back for another sprint. Velocity looks great.",
+        "night": "Late-night architecture review? I will keep it to twelve tickets.",
+        "streak": "{n}-day streak. Your learning platform has excellent uptime.",
+        "right": ["Approved at architecture review.", "Scales beautifully."],
+        "wrong": ["Solid instinct. Here is the biology behind the curtain.",
+                  "Good call to ask. Here is the systems view."],
+        "remind": "Twelve tickets in today's sprint. All small.",
+    },
+    "ceo": {
+        "greet": ["Big picture today: twelve questions that make every board slide sharper.",
+                  "Executive summary: you are about to understand the science even better."],
+        "first": "Welcome, chief. Think of today as a four-minute science briefing before the board meeting.",
+        "back": "Welcome back. Your strategy just gained a stronger science foundation.",
+        "night": "Burning the midnight oil? Quick science briefing, then rest. Doctor 1Q's orders.",
+        "streak": "{n}-day streak. That is leadership by example.",
+        "right": ["That is a board-ready answer.", "Investors would love that clarity."],
+        "wrong": ["Great question to get wrong now, not in a pitch. Here is the story.",
+                  "Here is the one-slide version of the science."],
+        "remind": "Your 4-minute science briefing is ready",
+    },
+    "clinical": {
+        "greet": ["Rounds with me take four minutes and nobody pages you.", "Today's case conference: twelve quick cases."],
+        "first": "Welcome! I speak fluent biomarker and a little bit of pun.",
+        "back": "Back for another round. Your clinical instincts are warming up.",
+        "night": "Late shift? I will keep the questions crisp and kind.",
+        "streak": "{n} days straight. Textbook adherence to the protocol.",
+        "right": ["Spot on, like a perfect stain.", "Diagnosis: sharp."],
+        "wrong": ["Reasonable call. Here is the evidence that tips it.", "Good differential. Here is the deciding clue."],
+        "remind": "Twelve quick cases are waiting",
+    },
+    "regulatory": {
+        "greet": ["Today's submission: twelve questions, zero redlines.", "Checklist ready. Every box is a fun fact."],
+        "first": "Welcome! I come pre-validated and fully documented.",
+        "back": "Welcome back. Audit trail shows excellent attendance.",
+        "night": "Late-night review? I promise no surprise findings.",
+        "streak": "{n}-day streak. That is fully compliant consistency.",
+        "right": ["Approved on first review.", "That answer would sail through any audit."],
+        "wrong": ["Good catch to make here, not in a submission. Here is the detail.", "Minor finding. Here is the fix."],
+        "remind": "Your daily SOP: twelve questions",
+    },
+    "business": {
+        "greet": ["Today's pitch: twelve questions that make customer chats sparkle.", "Quick science, big talking points."],
+        "first": "Welcome! I turn cell biology into stories customers love.",
+        "back": "Welcome back. Your science storytelling just leveled up.",
+        "night": "Late night prep? I will keep it slide-sized.",
+        "streak": "{n}-day streak. That is a great quarter.",
+        "right": ["Closed with confidence.", "That is a talking point for your next meeting."],
+        "wrong": ["Great one to learn before a customer asks. Here is the story.", "Here is the one-slide version."],
+        "remind": "Twelve talking points are waiting",
+    },
+    "ops": {
+        "greet": ["Inventory check: twelve fresh questions in stock.", "Everything ships on time today, including your quiz."],
+        "first": "Welcome! I keep things organized, like a perfectly labeled freezer box.",
+        "back": "Welcome back. Your knowledge inventory is restocked.",
+        "night": "Night shift logistics? Twelve small packages, then rest.",
+        "streak": "{n} days on schedule. Flawless logistics.",
+        "right": ["Delivered on time.", "Perfectly filed."],
+        "wrong": ["Good instinct. Here is the label that goes on this one.", "Small reroute. Here is the right shelf."],
+        "remind": "Twelve questions, delivered fresh",
+    },
+    "starter": {
+        "greet": ["Curious minds welcome. Twelve questions, four minutes, lots of fun.",
+                  "Every expert started exactly where you are. You are in great company."],
+        "first": "Welcome! I am 1Q, part cell, part comedian. Let's learn something cool.",
+        "back": "Welcome back! I saved your seat.",
+        "night": "Quizzing at midnight? Respect. Even mitochondria take breaks though.",
+        "streak": "{n} days in a row. I am doing a tiny cartwheel.",
+        "right": ["Look at you go.", "Rookie? Not today."],
+        "wrong": ["Great attempt. This one trips up lots of scientists.",
+                  "You just learned something lots of scientists had to look up once."],
+        "remind": "Your brain cells signed up for 12 reps today",
+    },
 }
+
+LOGIN_LINES = {
+    "night": ["Hello, night owl. I am awake too. Cells never fully sleep.",
+              "Late shift? Sign in and I will keep it short and sweet."],
+    "morning": ["Good morning! I already had my coffee. It was glucose.",
+                "Morning! My mitochondria are fully charged."],
+    "afternoon": ["Afternoon slump? Twelve questions beat a third coffee.",
+                  "Perfect timing. Post-lunch neurons are my favorite kind."],
+    "evening": ["Evening! Let's end the day a little smarter.",
+                "Golden hour for learning. I made it up, but it sounds right."],
+}
+LOGIN_POKES = ["Hey! That tickles.", "I am a cell, not a button. Okay, I am also a button.",
+               "Type your email, I promise I will not read it out loud.", "Stop, I'm ticklish!",
+               "Boop received. Booping back.", "Careful, I divide when I laugh."]
+
+
+def daypart(now: datetime) -> str:
+    h = now.hour
+    return "night" if h < 5 or h >= 23 else "morning" if h < 12 else "afternoon" if h < 17 else "evening"
+
+
+def login_line(now: datetime, known: dict | None = None) -> str:
+    """Mascot line on the login screen. known: {name, role, streak} for a returning email."""
+    if known:
+        g = role_group(known.get("role"))
+        st = known.get("streak") or 0
+        tail = ROLE_LINES[g]["streak"].format(n=st) if st >= 2 else ROLE_LINES[g]["back"]
+        return f"Oh hi, {known.get('name') or 'friend'}! {tail}"
+    return LOGIN_LINES[daypart(now)][now.toordinal() % 2]
+
+
+def persona_line(role: str | None, now: datetime, streak: int, first_time: bool, days_away: int | None) -> str:
+    """Home greeting tuned by persona, first visit vs returning, time of day and streak."""
+    from . import persona
+    p = persona.profile(role)
+    L = ROLE_LINES[persona.bucket(p)]
+    if first_time:
+        return f"{L['first']} {persona.SENIORITY_TAGS[p['seniority']]}"
+    if daypart(now) == "night":
+        return L["night"]
+    if streak >= 2:
+        return L["streak"].format(n=streak)
+    if days_away is not None and days_away >= 1:
+        return L["back"]
+    return L["greet"][now.toordinal() % len(L["greet"])]
 
 
 def role_line(role: str | None, kind: str, rng: random.Random | None = None) -> str:
@@ -339,4 +500,6 @@ def all_lines() -> list[str]:
     for grp in ROLE_LINES.values():
         for v in grp.values():
             out += v if isinstance(v, list) else [v]
-    return out
+    for v in LOGIN_LINES.values():
+        out += v
+    return out + LOGIN_POKES

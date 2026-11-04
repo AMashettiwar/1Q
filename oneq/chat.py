@@ -5,6 +5,7 @@ import random
 import re
 import time
 
+from . import persona
 from . import avatar, llm
 
 RATE_WINDOW_S, RATE_MAX, DAILY_MAX = 600, 15, 80
@@ -76,7 +77,7 @@ def reply(history: list[dict], msg: str, name: str, role: str | None, active_q: 
                  f"'{active_q['question']}' Options: {active_q['options']}. If asked, refuse playfully.")
     convo = "\n".join(f"{m['role']}: {m['content']}" for m in history[-8:])
     try:
-        out = p.chat(SYSTEM + f"\nUser: {name}, role at 1cell.ai: {role or 'unknown'}." + guard,
+        out = p.chat(SYSTEM + f"\nUser: {name}, role at 1cell.ai: {role or 'unknown'}." + persona.chat_brief(persona.profile(role)) + guard,
                      f"Conversation so far:\n{convo}\nuser: {msg}\nReply as 1Q.").strip()
     except Exception:
         return random.choice(OFFLINE)

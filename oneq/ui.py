@@ -5,6 +5,7 @@ Two themes share every rule; only the tokens in THEMES differ.
 from __future__ import annotations
 
 import html
+import json
 
 # Wardrobe palette: the layered colours of a heritage wardrobe. Each tone has a
 # light-theme ink (readable on ivory) and a dark-theme ink (readable on green-black).
@@ -163,11 +164,12 @@ h2 { font-size:28px !important; } h3 { font-size:20px !important; }
 .stButton > button[kind="primary"]:hover { background:var(--primary-hi); border-color:var(--primary-hi); color:var(--on-primary); }
 .stButton > button[kind="primary"] p { color:var(--on-primary) !important; }
 .stButton > button:disabled { opacity:.45; }
+.stRadio, .stRadio > div, div[data-testid="stRadio"] > div, div[role="radiogroup"] label > div:last-child { width:100% !important; max-width:100% !important; }
 div[role="radiogroup"] { display:flex !important; flex-direction:column; gap:8px; width:100%; }
 div[role="radiogroup"] label { width:100%; margin:0 !important; padding:14px 16px; border-radius:10px; background:var(--surface);
   border:1px solid var(--line2); transition:border-color .15s ease, background .15s ease, box-shadow .15s ease; }
 div[role="radiogroup"] label:hover { border-color:var(--muted); }
-div[role="radiogroup"] label:has(input:checked) { border-color:var(--primary); box-shadow:0 0 0 3px var(--focus); }
+div[role="radiogroup"] label:is(:has(input:checked),[data-selected="true"]) { border-color:var(--primary); box-shadow:0 0 0 3px var(--focus); }
 div[role="radiogroup"] label p { color:var(--ink) !important; font-size:15px; }
 .stTextInput input, .stSelectbox div[data-baseweb="select"] > div { border-radius:8px !important; background:var(--surface) !important; color:var(--ink) !important; }
 button[data-baseweb="tab"] { font-size:14px; font-weight:500; color:var(--muted); }
@@ -178,6 +180,11 @@ div[data-testid="stProgress"] > div > div > div > div { background:var(--primary
 div[data-testid="stMetric"] { border-top:1px solid var(--line); padding-top:8px; }
 div[data-testid="stMetricValue"] { font-family:'Fraunces',serif; font-size:24px !important; }
 div[data-testid="stChatMessage"] { background:transparent; padding:8px 0; }
+.stSelectbox div[role="group"] { background:var(--surface) !important; border:1px solid var(--line2) !important; border-radius:8px !important; }
+.stSelectbox div[role="group"] input, .stSelectbox div[role="group"] button { background:transparent !important; color:var(--ink) !important; }
+div[role="listbox"], .react-aria-Popover, .react-aria-ListBox { background:var(--surface) !important; color:var(--ink) !important; border:1px solid var(--line2); }
+div[role="listbox"] [role="option"] { color:var(--ink) !important; }
+div[role="listbox"] [role="option"][data-focused], div[role="listbox"] [role="option"]:hover { background:var(--surface2) !important; }
 .stApp input::placeholder, .stApp textarea::placeholder { color:var(--muted) !important; opacity:1; }
 .stApp div[data-baseweb="select"], .stApp div[data-baseweb="select"] > div, .stApp div[data-baseweb="select"] div { background-color:var(--surface) !important; color:var(--ink) !important; }
 .stApp div[data-baseweb="popover"] ul, .stApp div[data-baseweb="popover"] li { background:var(--surface) !important; color:var(--ink) !important; }
@@ -187,20 +194,55 @@ div[data-testid="stProgress"] div[role="progressbar"] > div > div { background:v
 .st-key-oneq_hidden { display:none !important; }
 .oq-chat-head { font-family:'Fraunces',serif; font-size:18px; margin:24px 0 8px; color:var(--ink); }
 
-/* mascot motion: slow and quiet */
-.oneq-avatar { flex-shrink:0; }
-.oneq-float { animation:oq-float 5s ease-in-out infinite; }
-.oneq-bounce { animation:oq-bounce 1.2s cubic-bezier(.3,.7,.3,1) infinite; }
-.oneq-wiggle { animation:oq-wiggle .4s ease-in-out infinite; }
-.oneq-breathe { animation:oq-breathe 5s ease-in-out infinite; }
-.oneq-avatar .blink { animation:oq-blink 6s infinite; transform-origin:60px 54px; }
-.oneq-avatar .oneq-orbit { animation:oq-spin 24s linear infinite; transform-origin:60px 60px; }
-@keyframes oq-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
-@keyframes oq-bounce { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
-@keyframes oq-wiggle { 0%,100%{transform:rotate(-4deg)} 50%{transform:rotate(4deg)} }
-@keyframes oq-breathe { 0%,100%{opacity:1} 50%{opacity:.8} }
-@keyframes oq-blink { 0%,95%,100%{transform:scaleY(1)} 97%{transform:scaleY(.1)} }
-@keyframes oq-spin { to { transform:rotate(360deg); } }
+/* ---------- 1Q, the living mascot ----------
+   Layers: .m-rig (pointer lean, set by JS) > .m-body (squash/stretch) > .m-face (look-at) > .m-eyes (blink).
+   All parts use transform-box so origins sit on the character, and every motion is spring-eased. */
+.oneq-avatar { flex-shrink:0; overflow:visible; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.oneq-avatar * { transform-box:fill-box; }
+.oneq-avatar .m-rig { transform-origin:50% 100%; transition:transform .5s var(--spring); }
+.oneq-avatar .m-body { transform-origin:50% 100%; animation:m-breathe 4.2s ease-in-out infinite; }
+.oneq-avatar .m-face { transition:transform .35s var(--spring); }
+.oneq-avatar .m-eyes { transform-origin:50% 50%; transition:transform .09s ease-in; }
+.oneq-avatar.blinking .m-eyes { transform:scaleY(.08); }
+.oneq-avatar .m-mouth { transform-origin:50% 30%; }
+.oneq-avatar.talking .m-mouth { animation:m-talk .18s ease-in-out infinite alternate; }
+.oneq-avatar.talking .m-body { animation:m-talkbob .36s ease-in-out infinite alternate; }
+.oneq-avatar .m-orbit { transform-origin:50% 50%; animation:m-spin 28s linear infinite; }
+.oneq-avatar .m-shadow { transform-origin:50% 50%; animation:m-shadow 4.2s ease-in-out infinite; }
+.oneq-avatar .m-burst { opacity:0; transform-origin:50% 50%; }
+.oneq-avatar .m-z { opacity:0; }
+.oneq-avatar .m-cheeks { transition:opacity .4s ease; }
+.oneq-avatar:hover .m-cheeks, .oneq-avatar[data-react="joy"] .m-cheeks, .oneq-avatar[data-react="shake"] .m-cheeks { opacity:.35; }
+.oneq-avatar:hover .m-rig { animation:m-wave .9s var(--spring) 1; }
+.oneq-avatar.poked .m-body { animation:m-squash .5s var(--spring) 1; }
+/* reactions, replayed by JS whenever the server sends a new one */
+.oneq-avatar.react[data-react="joy"] .m-body { animation:m-joy 1.1s var(--spring) 1, m-breathe 4.2s ease-in-out 1.1s infinite; }
+.oneq-avatar.react[data-react="joy"] .m-burst { animation:m-burst .9s cubic-bezier(.2,.8,.2,1) .35s 1; }
+.oneq-avatar.react[data-react="joy"] .m-shadow { animation:m-shadowjump 1.1s var(--spring) 1; }
+.oneq-avatar[data-react="empathy"] .m-rig { animation:m-empathy 1.6s cubic-bezier(.3,.7,.3,1) 1 forwards; }
+.oneq-avatar[data-react="think"] .m-rig { animation:m-think 3.6s ease-in-out infinite; }
+.oneq-avatar[data-react="sleep"] .m-body { animation:m-breathe 6.5s ease-in-out infinite; }
+.oneq-avatar[data-react="sleep"] .m-z { animation:m-z 3.2s ease-in-out infinite; }
+.oneq-avatar[data-react="shake"] .m-rig { animation:m-shake .5s ease-in-out 2; }
+.oneq-avatar[data-react="squint"] .m-rig { animation:m-squint 2.4s ease-in-out 1; }
+@keyframes m-breathe { 0%,100%{transform:scale(1,1)} 50%{transform:scale(1.018,.985)} }
+@keyframes m-shadow { 0%,100%{transform:scaleX(1)} 50%{transform:scaleX(1.04)} }
+@keyframes m-talk { from{transform:scaleY(.7)} to{transform:scaleY(1.25)} }
+@keyframes m-talkbob { from{transform:translateY(0) scale(1,1)} to{transform:translateY(-1.5px) scale(.99,1.01)} }
+@keyframes m-spin { to{transform:rotate(360deg)} }
+@keyframes m-wave { 0%{transform:rotate(0)} 25%{transform:rotate(-7deg)} 55%{transform:rotate(5deg)} 80%{transform:rotate(-2deg)} 100%{transform:rotate(0)} }
+@keyframes m-squash { 0%{transform:scale(1,1)} 25%{transform:scale(1.12,.86)} 55%{transform:scale(.94,1.08)} 80%{transform:scale(1.02,.98)} 100%{transform:scale(1,1)} }
+@keyframes m-joy { 0%{transform:translateY(0) scale(1,1)} 18%{transform:translateY(0) scale(1.14,.84)}
+  42%{transform:translateY(-22px) scale(.9,1.12)} 62%{transform:translateY(0) scale(1.1,.9)} 78%{transform:translateY(-4px) scale(.98,1.02)} 100%{transform:translateY(0) scale(1,1)} }
+@keyframes m-shadowjump { 0%,100%{transform:scaleX(1);opacity:.16} 42%{transform:scaleX(.6);opacity:.07} }
+@keyframes m-burst { 0%{opacity:0;transform:scale(.7)} 30%{opacity:1} 100%{opacity:0;transform:scale(1.25)} }
+@keyframes m-empathy { 0%{transform:rotate(0) translateY(0)} 40%{transform:rotate(-6deg) translateY(2px)} 100%{transform:rotate(-3deg) translateY(1px)} }
+@keyframes m-think { 0%,100%{transform:rotate(0)} 30%,70%{transform:rotate(5deg) translateY(-1px)} }
+@keyframes m-z { 0%{opacity:0;transform:translate(0,4px)} 30%{opacity:.9} 100%{opacity:0;transform:translate(6px,-10px)} }
+@keyframes m-shake { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-9deg)} 40%{transform:rotate(8deg)} 60%{transform:rotate(-6deg)} 80%{transform:rotate(4deg)} }
+@keyframes m-squint { 0%,100%{transform:translateX(0)} 30%{transform:translateX(-3px)} 60%{transform:translateX(3px)} }
+.oq-line .caret { display:inline-block; width:1px; height:1em; background:var(--ink); margin-left:2px; vertical-align:-2px; animation:oq-caret .9s steps(1) infinite; }
+@keyframes oq-caret { 50%{opacity:0} }
 @keyframes oq-in { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none} }
 @keyframes oq-fade { from{opacity:0} to{opacity:1} }
 @keyframes oq-rise { from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:none} }
@@ -210,15 +252,140 @@ div[data-testid="stProgress"] div[role="progressbar"] > div > div { background:v
   .oq-hero { gap:16px; } .oq-hero h1 { font-size:28px; } .oneq-avatar { width:72px; height:72px; }
   .oq-card { padding:16px; } .oq-podium { gap:8px; }
 }
+/* ================= expert layer: tokens, chrome, components ================= */
+:root { --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px;
+  --e1:0 1px 2px rgba(15,25,30,.05); --e2:0 1px 2px rgba(15,25,30,.04), 0 6px 16px rgba(15,25,30,.06);
+  --e3:0 2px 4px rgba(15,25,30,.05), 0 18px 40px rgba(15,25,30,.10); }
+/* hide default Streamlit chrome, keep the sidebar control */
+[data-testid="stToolbar"], [data-testid="stDecoration"], #MainMenu, footer, [data-testid="stStatusWidget"],
+.stDeployButton, [data-testid="stAppDeployButton"] { display:none !important; }
+header[data-testid="stHeader"] { height:48px; background:transparent !important; }
+[data-testid="stHeaderActionElements"], .stMarkdown a.anchor-link, [data-testid="stHeadingWithActionElements"] a { display:none !important; }
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+/* type: fluid display sizes with optical sizing; 4px baseline rhythm */
+body { font-size:15px; line-height:1.6; }
+.oq-display, .oq-hero h1, h1, h2 { font-optical-sizing:auto; text-wrap:balance; }
+.oq-hero h1 { font-size:clamp(28px, 1.6vw + 18px, 44px); line-height:1.08; letter-spacing:-.02em; }
+h2, .oq-display { font-size:clamp(24px, 1vw + 18px, 32px) !important; line-height:1.15; margin:4px 0 8px !important; }
+.oq-card h3 { font-size:clamp(18px, .5vw + 15px, 22px) !important; text-wrap:pretty; }
+.oq-num, .oq-row .sc, .oq-row .st, .oq-pod .sc, .oq-stat .v, .oq-ring .t b { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+.oq-ic { vertical-align:-2px; flex-shrink:0; }
+/* surfaces use the elevation scale */
+.oq-card { border-radius:var(--r-lg); box-shadow:var(--e2); }
+.oq-note { border-radius:var(--r-md); }
+/* hero */
+.oq-hero { padding:16px 0 24px; gap:clamp(16px, 2vw, 32px); }
+.oq-hero .oneq-avatar { width:clamp(84px, 6vw + 48px, 128px); height:auto; }
+.oq-line { min-height:1.6em; }
+/* progress charts */
+.oq-chart { animation:oq-in .6s var(--ease) both; }
+.oq-radar svg { max-width:420px; display:block; margin:0 auto; overflow:visible; }
+.oq-rshape { transform-origin:50% 50%; transform-box:view-box; animation:oq-grow .9s var(--spring) both; }
+.oq-rdot { opacity:0; animation:oq-fade .3s var(--ease) both; }
+@keyframes oq-grow { from { transform:scale(.2); opacity:0; } to { transform:scale(1); opacity:1; } }
+@keyframes oq-fade { to { opacity:1; } }
+[data-testid="stVegaLiteChart"], [data-testid="stArrowVegaLiteChart"] { animation:oq-in .6s var(--ease) both; }
+[data-testid="stVerticalBlock"] > div:nth-child(2) [data-testid="stVegaLiteChart"] { animation-delay:.08s; }
+@media (prefers-reduced-motion: reduce) { .oq-rshape, .oq-rdot, .oq-chart { animation:none !important; opacity:1; } }
+/* segmented tabs (react-aria tabs in Streamlit 1.66) */
+div[role="tablist"] { gap:4px; padding:4px; background:var(--surface2); border:1px solid var(--line); border-radius:12px; width:fit-content; max-width:100%;
+  overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--line) !important; box-shadow:none !important; }
+div[role="tablist"]::-webkit-scrollbar { display:none; }
+div[role="tablist"]::after, div[role="tablist"]::before { display:none !important; }
+[data-testid="stTab"] { height:36px; padding:0 16px !important; border-radius:9px; display:flex; align-items:center; margin:0 !important;
+  transition:background .2s var(--ease), color .2s var(--ease), box-shadow .2s var(--ease); white-space:nowrap; color:var(--muted); border:none !important; }
+[data-testid="stTab"] p { font-size:14px !important; font-weight:500; color:inherit !important; margin:0; }
+[data-testid="stTab"]:hover { color:var(--ink); }
+[data-testid="stTab"][aria-selected="true"] { background:var(--surface); box-shadow:var(--e1), 0 0 0 1px var(--line); color:var(--ink); }
+.react-aria-SelectionIndicator, div[data-baseweb="tab-highlight"], div[data-baseweb="tab-border"] { display:none !important; }
+div[role="tabpanel"] { padding-top:24px; animation:oq-in .4s var(--ease); }
+/* answer option cards: letter key, press, select, lock */
+[data-testid="stElementContainer"]:has(> [data-testid="stRadio"]), [data-testid="stRadio"], [data-testid="stRadio"] > div,
+div[role="radiogroup"], div[role="radiogroup"] label { width:100% !important; max-width:100% !important; }
+div[role="radiogroup"] { display:flex !important; flex-direction:column; align-items:stretch !important; gap:8px; counter-reset:opt; }
+div[role="radiogroup"] label { counter-increment:opt; position:relative; display:flex !important; align-items:center; min-height:56px;
+  padding:14px 16px 14px 60px !important; border-radius:var(--r-md) !important; background:var(--surface); border:1px solid var(--line2);
+  box-shadow:var(--e1); cursor:pointer; transition:border-color .18s var(--ease), box-shadow .18s var(--ease), transform .12s var(--ease), background .18s var(--ease);
+  animation:oq-in .45s var(--ease) both; }
+div[role="radiogroup"] label:nth-child(2) { animation-delay:.05s; } div[role="radiogroup"] label:nth-child(3) { animation-delay:.1s; }
+div[role="radiogroup"] label:nth-child(4) { animation-delay:.15s; }
+div[role="radiogroup"] label::before { content:counter(opt, upper-alpha); position:absolute; left:16px; top:50%; transform:translateY(-50%);
+  width:28px; height:28px; border-radius:8px; display:grid; place-items:center; font:600 12px/1 'Inter',sans-serif; letter-spacing:.04em;
+  color:var(--muted); border:1px solid var(--line2); background:var(--surface2); transition:all .2s var(--spring); }
+label[data-testid="stRadioOption"] > div > div:first-child:not([data-testid]) { display:none !important; }
+label[data-testid="stRadioOption"] > div { width:100%; }
+div[role="radiogroup"] label:hover { border-color:color-mix(in srgb, var(--primary) 45%, var(--line2)); transform:translateY(-1px); box-shadow:var(--e2); }
+div[role="radiogroup"] label:active { transform:scale(.992); }
+div[role="radiogroup"] label:is(:has(input:checked),[data-selected="true"]) { border-color:var(--primary); background:color-mix(in srgb, var(--primary) 6%, var(--surface));
+  box-shadow:0 0 0 3px var(--focus), var(--e2); }
+div[role="radiogroup"] label:is(:has(input:checked),[data-selected="true"])::before { background:var(--primary); color:var(--on-primary); border-color:var(--primary); transform:translateY(-50%) scale(1.06); }
+div[role="radiogroup"] label:has(input:focus-visible) { outline:2px solid var(--primary); outline-offset:2px; }
+div[role="radiogroup"] label p { font-size:15px !important; line-height:1.45; }
+.oq-kbd { display:inline-flex; gap:4px; align-items:center; color:var(--muted); font-size:12px; margin-top:8px; }
+.oq-kbd kbd { font:500 11px/1 'Inter',sans-serif; padding:3px 6px; border-radius:5px; border:1px solid var(--line2); background:var(--surface); color:var(--sub); box-shadow:0 1px 0 var(--line2); }
+/* buttons */
+.stButton > button, .stFormSubmitButton > button { min-height:44px; border-radius:var(--r-md); }
+.stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primaryFormSubmit"] { background:var(--primary); color:var(--on-primary); border-color:var(--primary);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14), var(--e1); }
+.stFormSubmitButton > button[kind="primaryFormSubmit"] p { color:var(--on-primary) !important; }
+*:focus-visible { outline:2px solid var(--primary) !important; outline-offset:2px; }
+/* feedback reveal */
+.oq-card.good, .oq-card.kind { animation:oq-reveal .5s var(--spring) both; }
+@keyframes oq-reveal { from{opacity:0; transform:translateY(8px) scale(.985)} to{opacity:1; transform:none} }
+.oq-verdict { display:inline-flex; align-items:center; gap:6px; font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-weight:600; }
+.oq-card.good .oq-verdict { color:var(--good); } .oq-card.kind .oq-verdict { color:var(--kind); }
+/* stats */
+.oq-stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:8px; margin:16px 0; }
+.oq-stat { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md); padding:12px; }
+.oq-stat .l { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--muted); letter-spacing:.02em; }
+.oq-stat .v { font-family:'Fraunces',serif; font-size:22px; color:var(--ink); margin-top:4px; line-height:1.15; overflow-wrap:normal; word-break:keep-all; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.oq-stat .v small { font-family:'Inter',sans-serif; font-size:12px; color:var(--muted); margin-left:4px; }
+section[data-testid="stSidebar"] .oq-stats { grid-template-columns:1fr 1fr; }
+section[data-testid="stSidebar"] .oq-stat:last-child { grid-column:span 2; }
+section[data-testid="stSidebar"] .oq-stat .v { font-size:clamp(16px,1.4vw,20px); }
+/* summary moment */
+.oq-summary { position:relative; padding:32px; margin:8px 0 24px; border-radius:var(--r-xl); background:var(--surface); border:1px solid var(--line);
+  box-shadow:var(--e3); overflow:hidden; animation:oq-reveal .7s var(--spring) both; }
+.oq-summary::before { content:""; position:absolute; inset:0 0 auto 0; height:4px;
+  background:linear-gradient(90deg, var(--primary) 0 40%, var(--navy) 40% 60%, var(--good) 60% 75%, var(--camel) 75% 90%, var(--brass) 90%); }
+.oq-summary p { color:var(--sub); margin:0 0 8px; }
+.oq-summary .oq-stat { background:var(--surface2); }
+.oq-summary .oq-stats .oq-stat { animation:oq-in .5s var(--ease) both; }
+.oq-summary .oq-stats .oq-stat:nth-child(2) { animation-delay:.08s; } .oq-summary .oq-stats .oq-stat:nth-child(3) { animation-delay:.16s; }
+/* leaderboard motion */
+.oq-row { animation:oq-in .45s var(--ease) both; }
+.oq-row:nth-child(2){animation-delay:.03s} .oq-row:nth-child(3){animation-delay:.06s} .oq-row:nth-child(4){animation-delay:.09s}
+.oq-row:nth-child(5){animation-delay:.12s} .oq-row:nth-child(6){animation-delay:.15s} .oq-row:nth-child(7){animation-delay:.18s}
+.oq-row:nth-child(8){animation-delay:.21s}
+.oq-row .st { display:inline-flex; gap:4px; align-items:center; justify-content:flex-end; }
+.oq-pod .step { transform-origin:bottom; animation:oq-grow .7s var(--spring) both; }
+.oq-pod.p1 .step { animation-delay:.12s; } .oq-pod.p3 .step { animation-delay:.2s; }
+@keyframes oq-grow { from{transform:scaleY(.2); opacity:0} to{transform:none; opacity:1} }
+.oq-move { display:inline-flex; align-items:center; gap:4px; font-size:13px; padding:2px 8px; border-radius:999px; background:var(--surface2); color:var(--sub); }
+.oq-move.up { color:var(--good); } .oq-move.down { color:var(--kind); }
+/* skeletons */
+.oq-skel { border-radius:var(--r-md); background:linear-gradient(90deg, var(--surface2) 0%, var(--surface) 50%, var(--surface2) 100%);
+  background-size:200% 100%; animation:oq-shimmer 1.3s linear infinite; }
+@keyframes oq-shimmer { to { background-position:-200% 0; } }
+/* charts sit on our surface */
+[data-testid="stVegaLiteChart"], [data-testid="stArrowVegaLiteChart"] { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:16px; }
+/* responsive */
+@media (min-width:1440px) { .block-container { max-width:820px; } }
+@media (min-width:1800px) { .block-container { max-width:880px; padding-top:56px; } body { font-size:16px; } }
+@media (max-width:768px) { .oq-summary { padding:24px; } div[role="tablist"] { width:100%; } }
+@media (max-width:640px) { .oq-hero { align-items:flex-start; } div[role="radiogroup"] label { padding-left:56px !important; }
+  .oq-stats { grid-template-columns:repeat(3, 1fr); } .oq-stat .v { font-size:18px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before { animation:none !important; transition:none !important; } }
 </style>
 """
 
 
 def css(theme: str = DEFAULT_THEME) -> str:
     t = THEMES.get(theme, THEMES[DEFAULT_THEME])
-    vars_ = ":root {" + "".join(f"--{k.replace('_', '-')}:{v};" for k, v in t.items() if isinstance(v, str)) + "}"
+    vars_ = ":root {--spring:cubic-bezier(.34,1.56,.64,1);" + "".join(f"--{k.replace('_', '-')}:{v};" for k, v in t.items() if isinstance(v, str)) + "}"
     if t["base"] == "dark":
         vars_ += " :root { color-scheme: dark; }"
+    vars_ += " :root{--spring:cubic-bezier(.34,1.56,.64,1);--ease:cubic-bezier(.2,.7,.2,1);}"
     return _CSS.replace("__VARS__", vars_)
 
 
@@ -242,10 +409,175 @@ SIGNALS_JS = """
   P.document.addEventListener('copy', () => { P.__oneqSignals.copy++; });
   P.document.addEventListener('paste', () => { P.__oneqSignals.paste++; });
   P.document.addEventListener('visibilitychange', () => { if (P.document.hidden) P.__oneqSignals.blur++; else push(); });
-  P.document.addEventListener('mousedown', (e) => { if ((e.target.innerText||'').match(/Submit today/)) push(); }, true);
+  P.document.addEventListener('mousedown', (e) => { if ((e.target.innerText||'').match(/Lock it in|Submit today/)) push(); }, true);
 })();
 </script>
 """
+
+
+
+LIVE_JS = """
+<script>
+(function(){
+  const W = window, D = document;
+  if (W.__oneqLive) return; W.__oneqLive = true;
+  const reduce = W.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let px = W.innerWidth/2, py = W.innerHeight/3, lastMove = Date.now();
+  const track = (x, y) => { px = x; py = y; lastMove = Date.now(); };
+  D.addEventListener('pointermove', e => track(e.clientX, e.clientY), {passive:true});
+  D.addEventListener('touchstart', e => { const t = e.touches[0]; if (t) track(t.clientX, t.clientY); }, {passive:true});
+
+  // Eyes and head follow the pointer with a soft lag. Each frame eases 12% toward the target.
+  const state = new WeakMap();
+  function frame(){
+    D.querySelectorAll('svg.oneq-avatar').forEach(svg => {
+      const st = state.get(svg) || {fx:0, fy:0, r:0}; state.set(svg, st);
+      const b = svg.getBoundingClientRect(); if (!b.width) return;
+      const cx = b.left + b.width/2, cy = b.top + b.height/2;
+      let dx = (px - cx) / Math.max(240, b.width*3), dy = (py - cy) / Math.max(240, b.height*3);
+      const idle = Date.now() - lastMove > 6000 || svg.dataset.react === 'sleep';
+      if (idle) { dx = Math.sin(Date.now()/2600)*.25; dy = .15; }
+      if (svg.dataset.react === 'think') { dx = .55; dy = -.6; }
+      dx = Math.max(-1, Math.min(1, dx)); dy = Math.max(-1, Math.min(1, dy));
+      st.fx += (dx*4.5 - st.fx)*.12; st.fy += (dy*3.5 - st.fy)*.12; st.r += (dx*4 - st.r)*.08;
+      const face = svg.querySelector('.m-face'), rig = svg.querySelector('.m-rig');
+      if (face) face.style.transform = `translate(${st.fx.toFixed(2)}px, ${st.fy.toFixed(2)}px)`;
+      if (rig && !svg.matches(':hover') && !['empathy','think','shake','squint'].includes(svg.dataset.react))
+        rig.style.transform = `rotate(${st.r.toFixed(2)}deg)`;
+      else if (rig) rig.style.transform = '';
+    });
+    if (!reduce) W.requestAnimationFrame(frame);
+  }
+  // Natural blinking: random gaps of 2 to 6 s, with an occasional double blink.
+  function blink(){
+    D.querySelectorAll('svg.oneq-avatar').forEach(svg => {
+      if (svg.dataset.react === 'sleep') return;
+      svg.classList.add('blinking'); setTimeout(() => svg.classList.remove('blinking'), 120);
+      if (Math.random() < .2) setTimeout(() => { svg.classList.add('blinking'); setTimeout(() => svg.classList.remove('blinking'), 110); }, 260);
+    });
+    setTimeout(blink, 2000 + Math.random()*4000);
+  }
+  // Clicking 1Q squashes it; three quick clicks send a real tickle to the server.
+  let clicks = [];
+  D.addEventListener('click', e => {
+    const svg = e.target.closest && e.target.closest('svg.oneq-avatar'); if (!svg) return;
+    svg.classList.remove('poked'); void svg.getBBox(); svg.classList.add('poked');
+    setTimeout(() => svg.classList.remove('poked'), 520);
+    const now = Date.now(); clicks = clicks.filter(t => now - t < 1200); clicks.push(now);
+    const btn = [...D.querySelectorAll('button')].find(b => (b.innerText||'').trim() === 'Poke 1Q');
+    if (btn && clicks.length >= 2) { clicks = []; btn.click(); }
+    // Login screen (no Poke button): 1Q answers pokes with local banter, no server round trip.
+    const hero = svg.closest('.oq-hero'); const pokes = hero && hero.dataset.pokes;
+    if (!btn && pokes) {
+      const list = JSON.parse(pokes); const line = hero.querySelector('.oq-line');
+      hero._pi = ((hero._pi ?? -1) + 1) % list.length;
+      if (line) { line.textContent = list[hero._pi]; }
+      svg.dataset.react = clicks.length >= 3 ? 'shake' : 'joy';
+      svg.classList.remove('react'); void svg.getBBox(); svg.classList.add('react');
+      svg.classList.add('talking'); setTimeout(() => { svg.classList.remove('react'); svg.classList.remove('talking'); }, 1200);
+    }
+  });
+  // While someone types their email on the login screen, 1Q bobs along and peeks at the field.
+  D.addEventListener('input', e => {
+    if (!e.target.matches || !e.target.matches('input[type="text"], input:not([type])')) return;
+    const svg = D.querySelector('.oq-hero[data-pokes] svg.oneq-avatar'); if (!svg || reduce) return;
+    svg.classList.add('talking'); clearTimeout(svg._tt); svg._tt = setTimeout(() => svg.classList.remove('talking'), 380);
+  }, true);
+  // Replay a reaction once per new server reaction id; type out the speech line while 1Q "talks".
+  const seen = {};
+  function wake(root){
+    root.querySelectorAll('svg.oneq-avatar').forEach(svg => {
+      const rid = svg.dataset.rid + ':' + svg.dataset.react;
+      if (seen[rid]) return; seen[rid] = true;
+      if (!reduce) { svg.classList.add('react'); setTimeout(() => svg.classList.remove('react'), 1800); }
+    });
+    root.querySelectorAll('.oq-line:not([data-typed])').forEach(el => {
+      el.dataset.typed = '1'; const full = el.textContent; el.dataset.full = full; const key = 'oq-said:' + full;
+      if (reduce || W.sessionStorage.getItem(key)) return;
+      W.sessionStorage.setItem(key, '1');
+      const svg = el.closest('.oq-hero') && el.closest('.oq-hero').querySelector('svg.oneq-avatar');
+      el.textContent = ''; const caret = D.createElement('span'); caret.className = 'caret';
+      el.appendChild(caret); svg && svg.classList.add('talking');
+      let i = 0; const step = () => {
+        i += full[i] === ' ' ? 2 : 1;
+        el.firstChild && el.firstChild.nodeType === 3 ? el.firstChild.textContent = full.slice(0, i) : el.insertBefore(D.createTextNode(full.slice(0, i)), caret);
+        if (i < full.length) setTimeout(step, /[.,!?]/.test(full[i-1]) ? 120 : 22);
+        else { svg && svg.classList.remove('talking'); setTimeout(() => caret.remove(), 900); }
+      }; step();
+    });
+    // Count-up for scores and stats.
+    root.querySelectorAll('[data-count]:not([data-counted])').forEach(el => {
+      el.dataset.counted = '1'; const to = +el.dataset.count; if (reduce || !to) return;
+      const t0 = performance.now(), dur = 900;
+      const tick = t => { const k = Math.min(1, (t - t0)/dur), e = 1 - Math.pow(1 - k, 3);
+        el.textContent = Math.round(to*e).toLocaleString(); if (k < 1) requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    });
+  }
+  new MutationObserver(() => wake(D)).observe(D.body, {childList:true, subtree:true});
+  // Keyboard: 1-4 or A-D picks an answer, Enter locks it in or moves on.
+  D.addEventListener('keydown', e => {
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const main = D.querySelector('[data-testid="stMain"]'); if (!main) return;
+    const k = e.key.toLowerCase(), idx = '1234'.indexOf(k) >= 0 ? '1234'.indexOf(k) : 'abcd'.indexOf(k);
+    const opts = main.querySelectorAll('div[role="radiogroup"] label');
+    if (idx >= 0 && opts[idx]) { opts[idx].click(); e.preventDefault(); return; }
+    if (e.key === 'Enter') {
+      const b = [...main.querySelectorAll('button')].find(b => /^(Lock it in|Next question|See my review|Next)$/.test((b.innerText||'').trim()) && !b.disabled);
+      if (b) { b.click(); e.preventDefault(); }
+    }
+  });
+  wake(D); if (!reduce) { W.requestAnimationFrame(frame); setTimeout(blink, 1800); }
+})();
+</script>
+"""
+
+
+
+# One line-icon set: 24px grid, 1.6 stroke, round caps. No emoji anywhere in the UI.
+ICONS = {
+    "flame": '<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.2 1.2-3.6 2.4-4.6.2 1.6 1 2.6 2.1 3.1C11 9 11 6 12 3z"/>',
+    "shield": '<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
+    "level": '<path d="M4 20V14M10 20V9M16 20V4M22 20H2"/>',
+    "trophy": '<path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9 17h6"/>',
+    "spark": '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/>',
+    "check": '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    "x": '<path d="M6 6l12 12M18 6L6 18"/>',
+    "up": '<path d="M12 19V5M6 11l6-6 6 6"/>',
+    "down": '<path d="M12 5v14M6 13l6 6 6-6"/>',
+    "dash": '<path d="M6 12h12"/>',
+    "points": '<circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10.5h4.5a1.5 1.5 0 0 1 0 3H9"/>',
+    "chat": '<path d="M4 5h16v11H9l-5 4V5z"/>',
+    "key": '<rect x="3" y="7" width="18" height="11" rx="2"/><path d="M7 11h1M11 11h1M15 11h2M7 14.5h10"/>',
+    "calendar": '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+}
+
+
+def icon(name: str, size: int = 16) -> str:
+    return (f'<svg class="oq-ic" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            f'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{ICONS.get(name, "")}</svg>')
+
+
+def num(v) -> str:
+    """Tabular number that counts up on first paint."""
+    if isinstance(v, (int, float)):
+        return f'<span class="oq-num" data-count="{int(v)}">{int(v):,}</span>'
+    return f'<span>{esc(v)}</span>'
+
+
+def stats(items) -> str:
+    cells = "".join(f'<div class="oq-stat"><div class="l">{icon(ic, 14)}{esc(lbl)}</div>'
+                    f'<div class="v">{num(v)}<small>{esc(unit)}</small></div></div>' for ic, lbl, v, unit in items)
+    return f'<div class="oq-stats">{cells}</div>'
+
+
+def summary(points: int, streak: int, title: str, extra: str = "") -> str:
+    """End-of-day moment. Private to the user, and still no right or wrong counts."""
+    return (f'<div class="oq-summary"><div class="oq-eyebrow">{icon("spark", 12)} Set complete</div>'
+            f'<h2 class="oq-display">That is today done.</h2><p>A fresh twelve unlocks at midnight, your time.</p>'
+            + stats([("points", "Points today", points, "pts"), ("flame", "Streak", streak, "days"),
+                     ("trophy", "Title", title, "")]) + extra + '</div>')
 
 
 def esc(t) -> str:
@@ -276,8 +608,9 @@ def period_vars(period: str, theme: str) -> str:
     return f"--a:{tone(a, theme)};--b:{tone(b, theme)}"
 
 
-def hero(svg: str, title: str, line: str, sub: str = "") -> str:
-    return (f'<div class="oq-hero">{svg}<div style="flex:1">'
+def hero(svg: str, title: str, line: str, sub: str = "", pokes: list[str] | None = None) -> str:
+    data = f" data-pokes='{esc(json.dumps(pokes))}'" if pokes else ""
+    return (f'<div class="oq-hero"{data}>{svg}<div style="flex:1">'
             f'{f"<div class=oq-eyebrow>{esc(sub)}</div>" if sub else ""}<h1>{esc(title)}</h1>'
             f'<div class="oq-line">{esc(line)}</div></div></div>')
 
@@ -311,7 +644,7 @@ def podium(rows: list[dict], period: str = "overall", theme: str = DEFAULT_THEME
             cells += "<div></div>"
             continue
         cells += (f'<div class="oq-pod p{n}">{monogram(r["name"])}<div class="nm">{esc(r["name"])}</div>'
-                  f'<div class="sc">{r["score"]:,} pts · {r["streak"]}d streak</div><div class="step">{n}</div></div>')
+                  f'<div class="sc">{num(r["score"])} pts · {r["streak"]}d streak</div><div class="step">{n}</div></div>')
     return f'<div class="oq-podium" style="{period_vars(period, theme)}">{cells}</div>'
 
 
@@ -321,7 +654,8 @@ def lb_rows(rows: list[dict], me_id: int, period: str = "overall", theme: str = 
     body = "".join(
         f'<div class="oq-row {"me" if r["user_id"] == me_id else ""}"><div class="rk">{r["rank"]}</div>{monogram(r["name"])}'
         f'<div class="who"><b>{esc(r["name"])}</b><span>{esc(r["title"])} · {esc(r["level"])}</span></div>'
-        f'<div class="st">{r["streak"]}d</div><div class="sc">{r["score"]:,}</div></div>' for r in rows)
+        f'<div class="st">{icon("flame", 12)}{r["streak"]}</div><div class="sc">{num(r["score"])}</div></div>'
+        for r in rows)
     return f'<div class="oq-list" style="{period_vars(period, theme)}">{body}</div>'
 
 
@@ -346,3 +680,32 @@ def share_html(name: str, streak: int, rank: int, of: int, title: str, day) -> s
             f'<i style="flex:1;height:3px;background:#7fc0a3"></i><i style="flex:1;height:3px;background:#b8935f"></i>'
             f'<i style="flex:1;height:3px;background:#a8874a"></i></div>'
             f'<div style="font-size:16px">{streak}-day streak · Rank {rank} of {of}</div></div>')
+
+
+def radar(topics: list[dict], theme: str = DEFAULT_THEME, size: int = 320) -> str:
+    """Animated spider chart of topic mastery (0-5). Inline SVG, themed, draws in on load."""
+    import math
+    if len(topics) < 3:
+        return ""
+    t = THEMES[theme]
+    n, c, R = len(topics), size / 2, size / 2 - 78
+    vmax = max(2.5, min(5.0, max(d["level"] for d in topics) * 1.2))  # zoom so early learners still see a shape
+    pt = lambda i, v: (c + R * v / vmax * math.sin(2 * math.pi * i / n), c - R * v / vmax * math.cos(2 * math.pi * i / n))
+    rings = "".join(f'<polygon points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, lv) for i in range(n)))}" '
+                    f'fill="none" stroke="{t["line"]}" stroke-width="1"/>' for lv in [vmax * f for f in (.2, .4, .6, .8, 1)])
+    spokes = "".join(f'<line x1="{c}" y1="{c}" x2="{pt(i, 5)[0]:.1f}" y2="{pt(i, 5)[1]:.1f}" stroke="{t["line"]}"/>' for i in range(n))
+    shape = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, d["level"]) for i, d in enumerate(topics)))
+    teal = tone("teal", theme)
+    dots, labels = "", ""
+    for i, d in enumerate(topics):
+        x, y = pt(i, d["level"])
+        col = tone(TOPIC_TONES.get(d.get("key", ""), "teal"), theme)
+        dots += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{col}" class="oq-rdot" style="animation-delay:{.5 + i * .05:.2f}s"><title>{esc(d["topic"])}: {d["level"]}</title></circle>'
+        lx, ly = pt(i, vmax * 1.14)
+        anchor = "middle" if abs(lx - c) < 8 else ("start" if lx > c else "end")
+        name = d["topic"] if len(d["topic"]) <= 16 else d["topic"][:15] + "…"
+        labels += f'<text x="{lx:.1f}" y="{ly + 4:.1f}" text-anchor="{anchor}" font-size="11" fill="{t["muted"]}">{esc(name)}</text>'
+    return (f'<div class="oq-chart oq-radar"><svg viewBox="0 0 {size} {size}" width="100%" role="img" '
+            f'aria-label="Topic mastery radar">{rings}{spokes}'
+            f'<polygon class="oq-rshape" points="{shape}" fill="{teal}" fill-opacity=".18" stroke="{teal}" stroke-width="2" '
+            f'stroke-linejoin="round"/>{dots}{labels}</svg></div>')

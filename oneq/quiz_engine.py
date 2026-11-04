@@ -386,7 +386,30 @@ def progress(s, u: User) -> dict:
     days = s.scalars(select(DailySet.day).where(DailySet.user_id == u.id, DailySet.completed.is_(True))).all()
     reviews = s.scalar(select(func.count()).select_from(ReviewItem).where(
         ReviewItem.user_id == u.id, ReviewItem.retired.is_(False)))
-    return {"topics": topics, "days": sorted(days), "pending_reviews": reviews or 0}
+    return {"topics": topics, "days": sorted(days), "pending_reviews": reviews or 0, **history(s, u)}
+
+
+def history(s, u: User, today: date | None = None, span: int = 84) -> dict:
+    """Private Progress history: activity, coverage, knowledge level over time and rank over time."""
+    today = today or date.today()
+    start = today - timedelta(days=span - 1)
+    pts = dict(s.execute(select(PointEvent.day, func.sum(PointEvent.points)).where(
+        PointEvent.user_id == u.id, PointEvent.day >= start).group_by(PointEvent.day)).all())
+    activity = [{"day": start + timedelta(days=i), "points": int(pts.get(start + timedelta(days=i), 0))} for i in range(span)]
+    cov = s.execute(select(Answer.subtopic, func.count()).where(Answer.user_id == u.id).group_by(Answer.subtopic)).all()
+    coverage = [{"key": k, "topic": SUBTOPICS.get(k, k), "answered": c} for k, c in cov if k in SUBTOPICS]
+    levels = {q["id"]: q.get("level", 2) for q in SEED_QUESTIONS}
+    ans = s.execute(select(Answer.day, Answer.question_id, Answer.correct).where(Answer.user_id == u.id)
+                    .order_by(Answer.created_at)).all()
+    r = adaptive.role_start_rating(u.role or "")
+    by_day: dict[date, float] = {}
+    for d, qid, ok in ans:
+        r = adaptive.update_rating(r, levels.get(qid, adaptive.rating_to_level(r)), bool(ok))
+        by_day[d] = r
+    level = [{"day": d, "level": round(min(5.0, max(0.2, (v - 600) / 200)), 2)} for d, v in sorted(by_day.items())]
+    ranks = [{"day": d, "rank": k} for d, k in s.execute(select(RankSnapshot.day, RankSnapshot.rank).where(
+        RankSnapshot.user_id == u.id).order_by(RankSnapshot.day)).all()]
+    return {"activity": activity, "coverage": coverage, "level_series": level, "rank_series": ranks}
 
 
 def admin_stats(s, today: date) -> dict:

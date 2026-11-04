@@ -36,6 +36,11 @@ def start_level(role: str, llm_guess=None) -> int:
     if role in roles:
         return roles[role]
     lvl = keyword_level(role)
+    if lvl is None:
+        from . import persona
+        prof = persona.profile(role)
+        if prof["function"] != "general":
+            lvl = persona.start_level(prof)
     if lvl is None and llm_guess:
         lvl = llm_guess(role)
     return lvl or 1

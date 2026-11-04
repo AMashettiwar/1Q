@@ -292,7 +292,13 @@ def test_tickle_escalates_and_resets():
 
 
 def test_role_flavor():
-    assert avatar.role_group("Intern") == "starter"
+    assert avatar.role_group("Intern") == "intern"
+    assert avatar.role_group("CTO") == "cto" and avatar.role_group("CEO") == "ceo"
+    assert avatar.role_group("Software engineer") == "tech"
+    from datetime import datetime as _dt
+    lines = {avatar.persona_line(r, _dt(2026, 1, 1, 10), 0, True, None) for r in ("Intern", "Software engineer", "PhD scientist", "CTO", "CEO")}
+    assert len(lines) == 5
+    assert all(avatar.is_safe(l) for l in avatar.all_lines())
     assert avatar.role_group("Computational scientist") == "comp"
     assert avatar.role_group("Wet-lab scientist") == "wetlab"
     assert avatar.role_group("PhD scientist") == "phd"
@@ -336,3 +342,12 @@ def test_chat_guard_and_rate_limit():
     rl = chat.RateLimiter(store)
     assert all(rl.allow(1000.0 + i) for i in range(chat.RATE_MAX))
     assert not rl.allow(1000.0 + chat.RATE_MAX)
+
+
+def test_greeting_uses_local_hour():
+    from datetime import datetime
+    from oneq import avatar
+    assert avatar.greeting("A", datetime(2026, 11, 4, 2)).startswith("Hello, night owl")
+    assert avatar.greeting("A", datetime(2026, 11, 4, 9)).startswith("Good morning")
+    assert avatar.greeting("A", datetime(2026, 11, 4, 14)).startswith("Good afternoon")
+    assert avatar.greeting("A", datetime(2026, 11, 4, 19)).startswith("Good evening")

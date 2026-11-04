@@ -6,6 +6,7 @@ roles:
   - {name: "Intern", start_level: basics}
   - {name: "Summer student / Co-op", start_level: basics}
   - {name: "Lab technician", start_level: basics}
+  - {name: "Technician", start_level: basics}
   - {name: "Lab assistant", start_level: basics}
   - {name: "Histotechnician", start_level: intermediate}
   - {name: "Research Associate", start_level: intermediate}
@@ -43,6 +44,9 @@ roles:
   - {name: "Operations / Supply chain", start_level: basics}
   - {name: "Finance / Legal / HR", start_level: basics}
   - {name: "Executive / Founder", start_level: intermediate}
+  # Leadership: executives start on a business-friendly intermediate track of science fundamentals
+  - {name: "CEO", start_level: intermediate}
+  - {name: "CTO", start_level: intermediate}
 
 # Free-text "Other" roles: first keyword hit wins (case-insensitive), else the LLM guesses, else basics.
 keywords:

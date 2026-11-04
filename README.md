@@ -80,3 +80,55 @@ All mascot lines and every LLM prompt follow the same rules: light and wholesome
 ## Palette
 
 The colours come from a heritage wardrobe: deep teal and midnight navy lead, greens and warm neutrals support. Tokens live in `oneq/ui.py` (`THEMES`, `PALETTE`, `TOPIC_TONES`, `PERIOD_TONES`, `SECTION_TONES`, `OUTFIT_TONES`). Each tone has a light-theme and a dark-theme value, and `tests/test_palette.py` checks WCAG AA contrast for all of them.
+
+## Role adaptation (any role, not a fixed list)
+
+`oneq/persona.py` turns any role text (a `roles.yaml` entry or free text typed under "Other") into a profile:
+
+| Field | Values |
+|---|---|
+| function | executive, regulatory, clinical, computational, engineering, wet-lab, science, operations, business, general |
+| seniority | early, mid, senior, exec |
+| familiarity | low, medium, high (how close the job is to cancer biology) |
+| hooks | wholesome humor hooks, e.g. pipettes, code review, board meetings, grants, audits, freezer inventory |
+
+How the profile is built:
+
+1. Keyword rules decide first. The first matching rule wins, e.g. "chief" → executive, "regulat" → regulatory, "lab" → wet-lab, "manager" → senior.
+2. If no rule matches and an LLM is configured, the LLM classifies the title as JSON. Its hooks then go through the same tone guard.
+3. If neither works, the role falls back to `general`.
+
+Profiles are cached per role text with an LRU cache, and the app computes them per signed-in user.
+
+What the profile drives:
+
+- **Mascot lines.** These cover the login greeting, the home greeting, and right/wrong lines.
+  - The fallback banks in `avatar.ROLE_LINES` are tagged by function: intern, tech, wetlab, comp, phd, clinical, regulatory, business, ops, cto, ceo and starter.
+  - `persona.SENIORITY_TAGS` adds a seniority overlay, so any role gets a fitting line without the LLM.
+  - Greetings also change for a first visit vs a returning visit, by time of day (night owl, morning, afternoon, evening) and by streak.
+  - On the login screen, once a known email is entered, 1Q greets the person by name with a persona and streak line. Poking 1Q cycles through local banter, and 1Q bobs along while you type.
+- **Chat.** `persona.chat_brief()` adds the function, seniority, familiarity, tone and hooks to the chat system prompt.
+- **Feedback tone.** The explanation label is "In plain words", "Why", "Mechanism" or "Business takeaway", depending on seniority. The same tone goes into LLM prompts.
+- **Starting level.** The order is:
+  1. a `roles.yaml` entry
+  2. a yaml keyword
+  3. the profile (familiarity × seniority)
+  4. the LLM guess
+  5. basics
+
+  Executives (CEO and CTO) start on a business-friendly intermediate track of science fundamentals.
+
+All lines pass the wholesome tone guard (`avatar.is_safe`), and the tests check every bank.
+
+## Progress charts (private)
+
+The Progress page is private and shows only your own data:
+
+- mastery radar (an animated inline SVG)
+- topic-coverage donut
+- per-topic mastery bars
+- 12-week activity heatmap
+- knowledge level over time (a replay of your answers through the rating model, shown as an area chart)
+- rank-over-time sparkline
+
+The charts use the wardrobe palette and animate in, and they respect prefers-reduced-motion. Public surfaces never show correct or wrong counts.
