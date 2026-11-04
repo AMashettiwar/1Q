@@ -302,8 +302,7 @@ def active_question(s, u: User, ds: DailySet) -> dict | None:
     return next((q for q in json.loads(ds.questions_json) if q["id"] not in done), None)
 
 
-def quiz_tab(s, u: User, ds: DailySet, rail: bool = False):
-    st.markdown(ui.section("quiz", "01 / Today's quiz", theme()), unsafe_allow_html=True)
+def quiz_tab(s, u: User, ds: DailySet):
     qs = json.loads(ds.questions_json)
     done = qe.answered_today(s, u, today())
     total = len(qs)
@@ -313,19 +312,55 @@ def quiz_tab(s, u: User, ds: DailySet, rail: bool = False):
         if not ds.completed:
             finish_day(s, u)
             st.rerun()  # refresh the sidebar streak and progress with the completed day
+        st.markdown(ui.section("quiz", "01 / Today's quiz", theme()), unsafe_allow_html=True)
         return results(s, u, ds, qs)
 
-    cur = len(done) - (1 if fb else 0)
     bar = "".join(f'<i class="{"on" if i < len(done) else "now" if i == len(done) and not fb else ""}"></i>' for i in range(total))
-    st.markdown(f'<div class="oq-qhead">{ui.progress_ring(len(done), total)}</div><div class="oq-qbar" aria-hidden="true">{bar}</div>',
-                unsafe_allow_html=True)
-    if not done and not rail:
-        teaser_q, _ = avatar.daily_pick(avatar.TEASERS, today(), "teaser")
-        st.markdown(f'<div class="oq-note"> <b>Today\'s cliffhanger</b><br>{ui.esc(teaser_q)}<br>'
-                    '<small>Finish today\'s set to unlock the answer.</small></div>', unsafe_allow_html=True)
-        if any(q.get("kind") == "boss" for q in qs):
-            st.markdown(ui.note(avatar.FRIDAY_BOSS, "trophy"), unsafe_allow_html=True)
+    with st.container(key="quiz_col"):
+        st.markdown(f'<div class="oq-qtop"><div class="oq-qhead">{ui.progress_ring(len(done), total)}</div>'
+                    f'<div class="oq-qbar" aria-hidden="true">{bar}</div></div>', unsafe_allow_html=True)
+        cstage, cmain = st.columns([1, 2.4], gap="medium")
+        with cstage:
+            quiz_stage(u, qs, done, fb, idx)
+        with cmain:
+            _quiz_body(s, u, qs, done, total, fb, idx)
 
+
+def quiz_stage(u: User, qs, done, fb, idx):
+    """The mascot is the star: compact, sticky, with a speech bubble that teases before and reacts after."""
+    with st.container(key="quiz_stage"):
+        q = fb["q"] if fb else (qs[idx] if idx is not None else None)
+        react = ""
+        if fb:
+            msg = SS.get("avatar_msg") or ""
+            expr = SS.get("avatar_expr") or ("cheering" if fb["correct"] else "oops")
+            react = " react " + ("good" if fb["correct"] else "kind")
+        elif SS.get("avatar_fresh") and SS.get("avatar_msg") and not done:
+            msg, expr = SS["avatar_msg"], SS.get("avatar_expr") or "happy"
+        else:
+            rng = random.Random(f"{u.id}{q['id'] if q else ''}{today()}")
+            msg, expr = avatar.ask_line(u.role, q.get("subtopic") if q else None, rng), "thinking"
+        SS.pop("avatar_fresh", None)
+        if SS.get("stage_tickle"):
+            msg, expr = SS.pop("stage_tickle")
+            react = " react"
+        st.markdown(f'<div class="oq-qstage{react}" data-r="{SS.get("react_id", 0)}">'
+                    f'<div class="fig">{mascot(expr, size=124)}</div>'
+                    f'<div class="oq-sbubble"><p>{ui.esc(msg)}</p></div></div>', unsafe_allow_html=True)
+        if st.button("Poke 1Q", key="poke_stage", icon=":material/touch_app:"):
+            SS["tickles"] = SS.get("tickles", 0) + 1
+            SS["stage_tickle"] = avatar.tickle_line(SS["tickles"])
+            if SS["tickles"] % len(avatar.TICKLE) == 0:
+                SS["tickles"] = 0
+            st.rerun()
+        if not done:
+            teaser_q, _ = avatar.daily_pick(avatar.TEASERS, today(), "teaser")
+            st.markdown(f'<div class="oq-tease"><b>Cliffhanger</b> {ui.esc(teaser_q)}</div>', unsafe_allow_html=True)
+
+
+def _quiz_body(s, u: User, qs, done, total, fb, idx):
+    if not done and any(q.get("kind") == "boss" for q in qs):
+        st.markdown(ui.note(avatar.FRIDAY_BOSS, "trophy"), unsafe_allow_html=True)
     if fb:
         q, good = fb["q"], fb["correct"]
         right = q["options"][q["answer_index"]]
@@ -340,7 +375,7 @@ def quiz_tab(s, u: User, ds: DailySet, rail: bool = False):
                 + f'<div class="oq-explain"><div class="oq-eyebrow">{lab}</div><p>{ui.esc(q["explanation"])}</p></div>')
         verdict = (ui.icon("check", 14) + "Correct") if good else (ui.icon("spark", 14) + "Worth a second look")
         st.markdown(f'<div class="oq-card {"good" if good else "kind"}"><div class="oq-meta"><span class="oq-verdict">{verdict}</span>'
-                    f'<span class="oq-eyebrow" style="margin:0">Q{fb["n"]} · locked in</span></div><h3>{ui.esc(fb["line"])}</h3>{body}</div>', unsafe_allow_html=True)
+                    f'<span class="oq-eyebrow" style="margin:0">Q{fb["n"]} · locked in</span></div><h3>{ui.esc(q["question"])}</h3>{body}</div>', unsafe_allow_html=True)
         if st.button("Next question" if idx is not None else "See my review", type="primary",
                      width="stretch", key="next_q"):
             SS.pop("feedback")
@@ -392,26 +427,6 @@ def quiz_tab(s, u: User, ds: DailySet, rail: bool = False):
         else:
             say(line, "cheering" if ok else "oops")
         st.rerun()
-
-
-def quiz_side(s, u: User, ds: DailySet):
-    """Desktop side rail next to the quiz: streak at a glance and a weekly board preview."""
-    with st.container(key="quiz_side"):
-        st.markdown(ui.heading("At a glance", "Today"), unsafe_allow_html=True)
-        n_done = len(qe.answered_today(s, u, today()))
-        n_q = len(json.loads(ds.questions_json))
-        st.markdown(ui.stats([("flame", "Streak", u.streak, "days"), ("shield", "Shields", u.shields, ""),
-                              ("check", "Answered", n_done, f"of {n_q}"),
-                              ("trophy", "Best streak", u.best_streak, "days")]),
-                    unsafe_allow_html=True)
-        teaser_q, _ = avatar.daily_pick(avatar.TEASERS, today(), "teaser")
-        st.markdown(f'<div class="oq-note"><b>Today\'s cliffhanger</b><br>{ui.esc(teaser_q)}<br>'
-                    '<small>Finish today\'s set to unlock the answer.</small></div>', unsafe_allow_html=True)
-        st.markdown(ui.heading("How today works", ""), unsafe_allow_html=True)
-        st.markdown('<ul class="oq-howto"><li>Twelve questions, about four minutes.</li>'
-                    '<li>Each answer locks in once. Hints are free.</li>'
-                    '<li>Misses come back later as a reworded rematch.</li>'
-                    '<li>Keys <kbd>1</kbd>–<kbd>4</kbd> pick, <kbd>Enter</kbd> locks in.</li></ul>', unsafe_allow_html=True)
 
 
 def finish_day(s, u: User):
@@ -769,7 +784,12 @@ def main():
         n_done = len(qe.answered_today(s, u, today()))
         prog = None if ds.completed else n_done / len(qs_today)
         asking = not ds.completed and not SS.get("feedback") and n_done < len(qs_today)
-        avatar_panel(u.display_name, mood, u.equipped, prog, asking)
+        if ds.completed:
+            avatar_panel(u.display_name, mood, u.equipped, prog, asking)
+        else:
+            st.markdown(f'<div class="oq-slim"><div class="g">{ui.esc(avatar.greeting(u.display_name, now_local()))}</div>'
+                        f'<span>{ui.icon("spark", 13)}{ui.esc(avatar.daily_pick(avatar.SAYS, today()))}</span></div>',
+                        unsafe_allow_html=True)
         with st.container(key="oneq_hidden"):
             st.text_input("signals", key="oneq_signals", label_visibility="collapsed")
         st.html(ui.SIGNALS_JS + ui.LIVE_JS, unsafe_allow_javascript=True)
@@ -780,14 +800,7 @@ def main():
             names.append("Admin")
         tabs = st.tabs(names)
         with tabs[0]:
-            if ds.completed:
-                quiz_tab(s, u, ds)
-            else:
-                qa, qb = st.container(key="grid_quiz").columns([2.2, 1], gap="large")
-                with qa:
-                    quiz_tab(s, u, ds, rail=True)
-                with qb:
-                    quiz_side(s, u, ds)
+            quiz_tab(s, u, ds)
         with tabs[1]:
             leaderboard_tab(s, u)
         with tabs[2]:

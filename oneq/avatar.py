@@ -507,7 +507,8 @@ _filter_banks()
 
 
 def all_lines() -> list[str]:
-    out = CORRECT + WRONG + FAST_CORRECT + SLOW_THINK + HINTS + TICKLE + CHEATING + SAYS
+    out = ASK_LINES + [l for v in TOPIC_QUIPS.values() for l in v] + list(ROLE_ASK.values())
+    out += CORRECT + WRONG + FAST_CORRECT + SLOW_THINK + HINTS + TICKLE + CHEATING + SAYS
     out += list(STREAK_MILESTONES.values()) + list(KEYWORDS.values()) + [MIDNIGHT, FRIDAY_BOSS, IDLE]
     out += [t for d in MYSTERY_DROPS for t in [d[2]]]
     for grp in ROLE_LINES.values():
@@ -582,3 +583,97 @@ def render(expression: str = "happy", accessory: str = "", energy: int = 100, ma
     """The user's chosen character in the given expression."""
     from . import mascots
     return mascots.svg(mascot, expression, size)
+
+
+# ---------------------------------------------------------------- pre-question lines (shared by every mascot)
+ASK_LINES = [
+    "New question, fresh cells. I am holding my breath. I do not have lungs, so this is easy.",
+    "Read it twice, answer once. That is my whole strategy. And my only strategy.",
+    "This one looks innocent. Questions are like cells: always check the receptors.",
+    "Take your time. The clock is mostly decorative. Like my eyebrows.",
+    "I know the answer. I am not telling. My lips are sealed. My membrane too.",
+    "Ooh, a good one. I would lean in, but I am already leaning.",
+    "Trust your first instinct. Then check it, like a good control.",
+    "Fun fact: I get ticklish when you hover over the right answer. Just kidding. Mostly.",
+    "Deep breath. You have seen harder ones before breakfast.",
+    "Brain warmed up? Mine is doing little stretches.",
+]
+
+TOPIC_QUIPS = {
+    "hallmarks": ["Hallmarks time. Cancer cells have a whole checklist. Overachievers, honestly.",
+                  "Ten hallmarks, one question. You only need the one."],
+    "oncogenes": ["Oncogenes are the gas pedal, suppressors the brakes. Pick your pedal.",
+                  "p53 is watching this one closely. It watches everything closely."],
+    "dna_repair": ["DNA repair question. Bring your tiny molecular toolbox.",
+                   "Somewhere a repair enzyme is clocking in for its shift. Let's join it."],
+    "immunotherapy": ["Immune system question. T cells love a good mystery.",
+                      "Checkpoints ahead. Show your badge to the T cell."],
+    "genomics": ["Genomics! Three billion letters and we only need the right one.",
+                 "Somewhere a sequencer just beeped in approval."],
+    "single_cell": ["Single-cell question. Every cell gets its own spotlight today.",
+                    "One cell at a time. Very civilized."],
+    "spatial": ["Spatial biology: where you are matters. Location, location, location.",
+                "Cells have neighbours too. Some of them are chatty."],
+    "drug_dev": ["Drug development question. Lock and key, but tinier.",
+                 "Targeted therapy: aim small, think big."],
+    "trials": ["Clinical trials question. Randomize your nerves and go.",
+               "Phases, arms, endpoints. Very organized. I approve."],
+    "biomarkers": ["Biomarker time. Little molecular breadcrumbs, waiting to be read.",
+                   "Biomarkers are clues. You are the detective."],
+    "tme": ["Tumor microenvironment: it is a whole neighbourhood in there.",
+            "The neighbours always know something. Ask the fibroblasts."],
+    "epigenetics": ["Epigenetics: same script, different highlighter.",
+                    "Methyl groups are tiny sticky notes. Read them carefully."],
+    "metastasis": ["Invasion and metastasis. Cells with a travel itinerary.",
+                   "Some cells pack a suitcase. This question is about the packing list."],
+    "pathology": ["Pathology and imaging. Squint like a microscope. Nicely.",
+                  "Pink, purple, patterns. Pathologists see poetry in there."],
+    "radiation": ["Radiation and surgery: precision is the whole game.",
+                  "Steady hands, steady beam, steady you."],
+    "epidemiology": ["Screening and prevention. Big numbers, big picture.",
+                     "Epidemiology: where one decimal point can tell a story."],
+}
+
+ROLE_ASK = {
+    "intern": "Pro tip from your favourite cell: elimination works wonders.",
+    "tech": "Treat it like a bug report: read the error, then the stack.",
+    "wetlab": "Think bench-side: what would the gel show?",
+    "comp": "Think of it as a feature you need to explain to a model.",
+    "phd": "Mechanism first, memory second. You know the drill.",
+    "cto": "Systems thinking applies to cells too. Find the bottleneck.",
+    "ceo": "One-line answer, big-picture reason. Your favourite format.",
+    "clinical": "Bench to bedside in one click. You know this road.",
+    "regulatory": "Read it like a label: every word is there for a reason.",
+    "business": "Cut through the jargon. The answer is usually the plain one.",
+    "ops": "Process of elimination is still a process. Run it.",
+    "starter": "No pressure. Every answer teaches me something too.",
+}
+
+
+def ask_line(role: str | None, subtopic: str | None, rng: random.Random | None = None) -> str:
+    """Witty, wholesome line shown before a question: topic quip, role tip or a general one-liner."""
+    r = rng or random
+    roll = r.random()
+    if subtopic in TOPIC_QUIPS and roll < .55:
+        out = r.choice(TOPIC_QUIPS[subtopic])
+    elif roll < .75:
+        out = ROLE_ASK.get(role_group(role), ROLE_ASK["starter"])
+    else:
+        out = r.choice(ASK_LINES)
+    return out if is_safe(out) else r.choice([l for l in ASK_LINES if is_safe(l)])
+
+
+# extra reactions in the ticklish style
+CORRECT += [
+    "Nailed it! I would high-five you but I am mostly cytoplasm.",
+    "Correct! I just did a little wiggle. You missed it. It was majestic.",
+    "Yes! That answer had excellent posture.",
+    "Bullseye. My mitochondria are throwing a tiny party.",
+]
+WRONG += [
+    "Close one! That option was a very convincing decoy.",
+    "Not this time, but now you know it forever. That is how memory works.",
+    "Plot twist! The explanation below is genuinely fun, I promise.",
+    "Tricky one. Even the textbooks had a draft two of this.",
+]
+_filter_banks()
