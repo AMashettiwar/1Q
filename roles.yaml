@@ -1,0 +1,52 @@
+# 1Q roles. Edit freely: add, rename or re-level any role, then redeploy.
+# start_level: basics | intermediate | advanced | expert
+# The placement quiz fine-tunes the level after the first login.
+roles:
+  # Early career and support
+  - {name: "Intern", start_level: basics}
+  - {name: "Summer student / Co-op", start_level: basics}
+  - {name: "Lab technician", start_level: basics}
+  - {name: "Lab assistant", start_level: basics}
+  - {name: "Histotechnician", start_level: intermediate}
+  - {name: "Research Associate", start_level: intermediate}
+  - {name: "Senior Research Associate", start_level: intermediate}
+  # Science
+  - {name: "Wet-lab scientist", start_level: advanced}
+  - {name: "Scientist", start_level: advanced}
+  - {name: "Senior Scientist", start_level: advanced}
+  - {name: "PhD scientist", start_level: advanced}
+  - {name: "Postdoctoral fellow", start_level: advanced}
+  - {name: "Pathologist", start_level: expert}
+  - {name: "Clinical scientist / MD", start_level: expert}
+  - {name: "Principal Scientist / Lead", start_level: expert}
+  - {name: "Director / Head of Science", start_level: expert}
+  # Computational and data
+  - {name: "Computational biologist", start_level: advanced}
+  - {name: "Bioinformatician", start_level: intermediate}
+  - {name: "Data scientist", start_level: intermediate}
+  - {name: "Machine learning engineer", start_level: basics}
+  - {name: "Software engineer", start_level: basics}
+  - {name: "Data engineer", start_level: basics}
+  - {name: "DevOps / IT", start_level: basics}
+  # Clinical, quality and regulatory
+  - {name: "Clinical operations", start_level: intermediate}
+  - {name: "Clinical research coordinator", start_level: intermediate}
+  - {name: "Quality assurance / Quality control", start_level: intermediate}
+  - {name: "Regulatory affairs", start_level: intermediate}
+  - {name: "Medical affairs / Medical science liaison", start_level: advanced}
+  # Business
+  - {name: "Product manager", start_level: basics}
+  - {name: "Project / Program manager", start_level: basics}
+  - {name: "Business development", start_level: basics}
+  - {name: "Sales / Field application scientist", start_level: intermediate}
+  - {name: "Marketing / Communications", start_level: basics}
+  - {name: "Operations / Supply chain", start_level: basics}
+  - {name: "Finance / Legal / HR", start_level: basics}
+  - {name: "Executive / Founder", start_level: intermediate}
+
+# Free-text "Other" roles: first keyword hit wins (case-insensitive), else the LLM guesses, else basics.
+keywords:
+  expert: [principal, director, head, vp, chief, cso, pathologist, oncologist, md, physician, professor]
+  advanced: [phd, scientist, postdoc, wet, wet-lab, computational biolog, immunolog, msl]
+  intermediate: [associate, bioinformatic, data scien, clinical, regulatory, quality, histo, field application]
+  basics: [intern, student, technician, assistant, engineer, sales, marketing, finance, hr, ops, admin]
