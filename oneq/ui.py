@@ -376,6 +376,208 @@ section[data-testid="stSidebar"] .oq-stat .v { font-size:clamp(16px,1.4vw,20px);
 @media (max-width:640px) { .oq-hero { align-items:flex-start; } div[role="radiogroup"] label { padding-left:56px !important; }
   .oq-stats { grid-template-columns:repeat(3, 1fr); } .oq-stat .v { font-size:18px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation:none !important; transition:none !important; } }
+/* ================= v3: refinement layer ================= */
+:root { --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; }
+/* type: 13 / 15 / 17 / 22 / 30 / 44, serif display, sans UI */
+.oq-h { display:flex; align-items:baseline; justify-content:space-between; margin:32px 0 12px; }
+.oq-h h3 { font-size:20px !important; margin:0 !important; letter-spacing:-.01em; }
+.oq-h span { font-size:12px; color:var(--muted); }
+.oq-fine { font-size:12.5px; color:var(--muted); line-height:1.5; margin-top:12px; display:flex; gap:6px; align-items:center; justify-content:center; text-align:center; }
+.stApp h3 { letter-spacing:-.01em; }
+/* sign-in card */
+.st-key-login_card { max-width:460px; margin:40px auto 0; padding:0 32px 28px; background:var(--surface); border:1px solid var(--line);
+  border-radius:24px; box-shadow:var(--e3); position:relative; overflow:visible; animation:oq-in .6s var(--ease) both; }
+.st-key-login_card::before { content:""; position:absolute; inset:0 0 auto 0; height:132px; border-radius:24px 24px 0 0;
+  background:radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 70%); pointer-events:none; }
+.oq-hero.login { flex-direction:column; text-align:center; gap:0; border:none; padding:0 0 4px; margin:0; align-items:center; }
+.oq-hero.login .oq-stage { margin-top:-56px; height:150px; display:flex; align-items:flex-end; justify-content:center; }
+.oq-hero.login .oneq-avatar { width:140px !important; height:auto; animation:oq-peek 1.4s cubic-bezier(.3,1.35,.5,1) both; filter:drop-shadow(0 10px 14px rgba(15,25,30,.14)); }
+@keyframes oq-peek { 0%{transform:translateY(46px) scale(.9); opacity:0} 40%{transform:translateY(10px) rotate(-5deg); opacity:1} 62%{transform:translateY(6px) rotate(5deg)} 100%{transform:none} }
+.oq-bubble { position:relative; margin:10px 0 18px; padding:12px 16px; border-radius:16px; background:var(--surface2); border:1px solid var(--line);
+  max-width:360px; transition:transform .3s var(--spring); }
+.oq-bubble::before { content:""; position:absolute; top:-7px; left:50%; width:12px; height:12px; background:var(--surface2);
+  border-left:1px solid var(--line); border-top:1px solid var(--line); transform:translateX(-50%) rotate(45deg); }
+.oq-bubble .oq-line { border:none; padding:0; margin:0; font-size:15px; color:var(--ink); min-height:auto; }
+.oq-bubble.pop { animation:oq-pop .35s var(--spring); }
+@keyframes oq-pop { 0%{transform:scale(.96)} 60%{transform:scale(1.02)} 100%{transform:none} }
+.oq-hero.login h1 { font-size:30px !important; margin:2px 0 18px !important; }
+.oq-hero.login .oq-eyebrow { margin:0; }
+.st-key-login_card [data-testid="stTextInput"] label p { font-size:13px; font-weight:500; color:var(--sub) !important; }
+.st-key-login_card input { height:44px; font-size:15px !important; }
+/* pills */
+[data-testid="stButtonGroup"] { margin-top:-4px; }
+[data-testid="stButtonGroup"] button { border-radius:999px !important; min-height:30px !important; padding:2px 12px !important; font-size:12.5px !important;
+  background:transparent !important; border:1px solid var(--line2) !important; color:var(--sub) !important; transition:all .15s var(--ease); }
+[data-testid="stButtonGroup"] button:hover { border-color:var(--primary) !important; color:var(--primary) !important; }
+[data-testid="stButtonGroup"] button[aria-checked="true"], [data-testid="stButtonGroup"] button[kind$="Active"] { background:var(--primary) !important; color:var(--on-primary) !important; border-color:var(--primary) !important; }
+[data-testid="stButtonGroup"] button p { font-size:12.5px !important; color:inherit !important; }
+/* inputs */
+.stTextInput input:focus, .stTextInput div[data-baseweb="input"]:focus-within { border-color:var(--primary) !important; box-shadow:0 0 0 3px var(--focus) !important; }
+.stTextInput div[data-baseweb="input"] { border-radius:10px !important; border:1px solid var(--line2) !important; background:var(--surface) !important; transition:box-shadow .15s, border-color .15s; }
+/* locked answers */
+.oq-opts { display:flex; flex-direction:column; gap:8px; margin:16px 0 4px; }
+.oq-opt { display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:var(--r-md); border:1px solid var(--line); background:var(--surface);
+  color:var(--muted); font-size:15px; animation:oq-in .35s var(--ease) both; }
+.oq-opt .k { width:26px; height:26px; border-radius:7px; display:grid; place-items:center; font:600 12px/1 Inter,sans-serif; border:1px solid var(--line2); background:var(--surface2); flex-shrink:0; }
+.oq-opt .t { flex:1; } .oq-opt .mk { display:flex; }
+.oq-opt.right { color:var(--ink); border-color:color-mix(in srgb, var(--good) 55%, transparent); background:color-mix(in srgb, var(--good) 8%, var(--surface)); animation:oq-in .35s var(--ease) both, oq-settle .6s var(--spring) .2s; }
+.oq-opt.right .k { background:var(--good); border-color:var(--good); color:var(--on-primary); } .oq-opt.right .mk { color:var(--good); }
+.oq-opt.wrong { color:var(--ink); border-color:color-mix(in srgb, var(--kind) 50%, transparent); background:color-mix(in srgb, var(--kind) 6%, var(--surface)); animation:oq-in .35s var(--ease) both, oq-nudge .45s ease .15s; }
+.oq-opt.wrong .k { background:var(--kind); border-color:var(--kind); color:var(--on-primary); } .oq-opt.wrong .mk { color:var(--kind); }
+@keyframes oq-settle { 0%{transform:scale(1)} 40%{transform:scale(1.015)} 100%{transform:none} }
+@keyframes oq-nudge { 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-2px)} 80%{transform:translateX(1px)} }
+.oq-explain { margin-top:16px; padding:14px 16px; border-radius:var(--r-md); background:var(--surface2); border:1px solid var(--line); }
+.oq-explain .oq-eyebrow { margin-bottom:4px; color:var(--brass-ink); }
+.oq-explain p { margin:0 !important; color:var(--ink) !important; }
+/* progress bar */
+div[data-testid="stProgress"] div[role="progressbar"] { height:6px !important; border-radius:999px; background:var(--surface2) !important; }
+div[data-testid="stProgress"] div[role="progressbar"] > div { border-radius:999px; }
+div[data-testid="stProgress"] div[role="progressbar"] > div > div { border-radius:999px; background:linear-gradient(90deg, var(--primary), color-mix(in srgb, var(--primary) 60%, var(--brass))) !important; transition:width .6s var(--ease); }
+.oq-qbar { display:flex; gap:4px; margin:4px 0 0; } .oq-qbar i { flex:1; height:4px; border-radius:2px; background:var(--line2); transition:background .4s var(--ease); }
+.oq-qbar i.on { background:var(--primary); } .oq-qbar i.now { background:var(--brass); animation:oq-breath 1.6s ease-in-out infinite; }
+@keyframes oq-breath { 50%{opacity:.45} }
+/* confetti-lite */
+.oq-confetti { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+.oq-confetti i { position:absolute; top:-12px; width:7px; height:11px; border-radius:2px; opacity:0; animation:oq-fall 1.8s cubic-bezier(.2,.6,.4,1) both; }
+@keyframes oq-fall { 0%{opacity:0; transform:translate(0,0) rotate(0)} 10%{opacity:1} 100%{opacity:0; transform:translate(var(--dx), 260px) rotate(var(--r))} }
+/* tables (admin) */
+.oq-table { border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden; background:var(--surface); }
+.oq-table table { width:100%; border-collapse:collapse; font-size:14px; }
+.oq-table th { text-align:left; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; font-weight:500; color:var(--muted); padding:10px 16px; background:var(--surface2); }
+.oq-table td { padding:12px 16px; border-top:1px solid var(--line); color:var(--ink); font-variant-numeric:tabular-nums; }
+.oq-table tr:hover td { background:color-mix(in srgb, var(--primary) 4%, transparent); }
+/* empty states */
+.oq-empty { display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--muted); background:color-mix(in srgb, var(--surface) 60%, transparent); }
+.oq-empty .oq-ic { color:var(--brass); }
+/* sidebar: quiet, no default chrome */
+section[data-testid="stSidebar"] { width:320px !important; }
+section[data-testid="stSidebar"] h3 { font-size:22px !important; margin-bottom:0 !important; }
+[data-testid="stSidebarCollapseButton"] button, [data-testid="stExpandSidebarButton"], [data-testid="stSidebarCollapsedControl"] button {
+  border-radius:10px !important; border:1px solid var(--line2) !important; background:var(--surface) !important; color:var(--sub) !important; box-shadow:var(--e1); }
+[data-testid="stSidebarCollapseButton"] button:hover, [data-testid="stExpandSidebarButton"]:hover { color:var(--primary) !important; border-color:var(--primary) !important; }
+.st-key-poke button { min-height:32px !important; font-size:12.5px !important; border-radius:999px !important; padding:0 12px !important; background:transparent !important; }
+/* toggles */
+[data-testid="stCheckbox"] label span[role="checkbox"], label[data-baseweb="checkbox"] > div:first-child { transition:background .2s var(--ease); }
+/* charts: our card, quiet axes */
+[data-testid="stVegaLiteChart"] summary, [data-testid="stVegaLiteChart"] details, .vega-embed .vega-actions, .vega-embed summary { display:none !important; }
+/* chat */
+.stChatMessage, div[data-testid="stChatMessage"] { gap:10px; }
+div[data-testid="stChatMessage"] [data-testid="stChatMessageContent"] { background:var(--surface2); border:1px solid var(--line); border-radius:14px; padding:8px 12px; font-size:14px; }
+div[data-testid="stChatMessage"]:has([aria-label*="user" i]) [data-testid="stChatMessageContent"] { background:color-mix(in srgb, var(--primary) 9%, var(--surface)); }
+section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] { border-radius:14px !important; border-color:var(--line) !important; background:var(--bg); }
+/* toast */
+[data-testid="stToast"] { background:var(--surface) !important; border:1px solid var(--line2); border-radius:12px !important; box-shadow:var(--e3); color:var(--ink); }
+.oq-note-i { display:flex; gap:12px; align-items:flex-start; } .oq-note-i .oq-ic { color:var(--brass); margin-top:3px; }
+[class*="st-key-role_pill"] [data-testid="stButtonGroup"] > div, [class*="st-key-role_pill"] div[data-baseweb="button-group"] { display:flex !important; flex-direction:row !important; flex-wrap:wrap !important; gap:6px !important; }
+[class*="st-key-role_pill"] .stButtonGroup { display:flex !important; flex-wrap:wrap !important; gap:6px !important; } [class*="st-key-role_pill"] .stButtonGroup > div { flex-direction:row !important; flex-wrap:wrap !important; gap:6px !important; width:auto !important; }
+[class*="st-key-role_pill"] button { width:auto !important; flex:0 0 auto !important; }
+
+/* ================= v4: mascots, stage, progress, chat, review ================= */
+__MASCOTCSS__
+/* header stage: the chosen character, large and alive */
+.oq-hero.main { gap:28px; padding:20px 0 28px; }
+.oq-stage.hero { position:relative; width:168px; height:176px; flex:0 0 168px; display:flex; align-items:flex-end; justify-content:center; }
+.oq-stage.hero .halo { position:absolute; left:50%; top:52%; width:150px; height:150px; transform:translate(-50%,-50%); border-radius:50%;
+  background:radial-gradient(circle at 50% 45%, var(--brass-soft), transparent 68%); opacity:.9; animation:oq-halo 6s ease-in-out infinite; }
+.oq-stage.hero .floor { position:absolute; bottom:6px; left:50%; width:110px; height:10px; transform:translateX(-50%); border-radius:50%;
+  background:radial-gradient(closest-side, rgba(0,0,0,.14), transparent); }
+.oq-stage svg.oq-m { position:relative; width:168px !important; height:auto; filter:drop-shadow(0 10px 18px rgba(15,25,30,.16)); }
+@keyframes oq-halo { 50% { transform:translate(-50%,-50%) scale(1.06); opacity:.7; } }
+.oq-hero.main .oq-copy { flex:1; min-width:0; }
+.oq-hero.main .oq-line { position:relative; display:inline-block; margin-top:14px; padding:12px 16px; border:1px solid var(--line); border-left:1px solid var(--line);
+  background:var(--surface); border-radius:4px 16px 16px 16px; box-shadow:var(--shadow); max-width:560px; color:var(--ink); font-size:15.5px; }
+.oq-hero.main .oq-line::before { content:""; position:absolute; left:-7px; top:10px; width:12px; height:12px; background:var(--surface);
+  border-left:1px solid var(--line); border-bottom:1px solid var(--line); transform:rotate(45deg); }
+.oq-says { display:flex; gap:8px; align-items:center; color:var(--muted); font-size:13.5px; padding-top:6px; }
+.oq-says .oq-ic { color:var(--brass); flex-shrink:0; }
+.oq-hero.login .oq-stage { margin-top:-92px; height:190px; }
+.oq-hero.login svg.oq-m { width:180px !important; height:auto; filter:drop-shadow(0 12px 16px rgba(15,25,30,.16)); }
+.st-key-login_card { margin-top:110px !important; }
+@media (max-width:640px) {
+  .oq-hero.main { gap:14px; padding:12px 0 18px; align-items:flex-start; }
+  .oq-stage.hero { width:104px; height:112px; flex-basis:104px; } .oq-stage svg.oq-m { width:104px !important; }
+  .oq-stage.hero .halo { width:96px; height:96px; } .oq-hero.main h1 { font-size:26px !important; }
+  .oq-hero.login svg.oq-m { width:150px !important; } .oq-hero.login .oq-stage { height:160px; margin-top:-80px; }
+}
+/* picker */
+.oq-pick-head { text-align:center; max-width:620px; margin:12px auto 28px; }
+.oq-pick-head h1 { font-size:44px !important; margin:6px 0 10px !important; }
+.oq-pick-head p { color:var(--sub); font-size:16px; margin:0; }
+.oq-mcard { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:12px 12px 14px; text-align:center;
+  box-shadow:var(--shadow); transition:transform .3s var(--spring), box-shadow .3s, border-color .3s; animation:oq-in .5s var(--ease) both; }
+.oq-mcard:hover { transform:translateY(-4px); box-shadow:0 18px 36px -20px rgba(15,40,45,.45); }
+.oq-mcard.on { border-color:var(--brass); box-shadow:0 0 0 3px var(--brass-soft), var(--shadow); }
+.oq-mcard .st { border-radius:14px; background:radial-gradient(120% 90% at 50% 20%, var(--surface), var(--surface2)); aspect-ratio:1/1.02;
+  display:grid; place-items:center; overflow:hidden; }
+.oq-mcard .st svg { width:94%; height:auto; }
+.oq-mcard h4 { font-family:'Fraunces',Georgia,serif; font-weight:500; font-size:19px; margin:12px 0 4px; color:var(--ink); }
+.oq-mcard p { font-size:12.5px; line-height:1.45; color:var(--sub); margin:0; min-height:54px; }
+.oq-mcard q { display:block; font-family:'Fraunces',Georgia,serif; font-style:italic; font-size:13px; color:var(--ink); margin:10px 0 0;
+  padding-top:10px; border-top:1px dashed var(--line); min-height:56px; }
+.oq-mcard.compact p, .oq-mcard.compact q { display:none; } .oq-mcard.compact h4 { font-size:15px; margin:8px 0 0; }
+.oq-mcard .sel { display:inline-flex; gap:4px; align-items:center; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--brass); margin-top:6px; }
+[class*="_card"] [data-testid="stButton"] button { border-radius:999px !important; }
+.oq-label { font-size:14px; color:var(--ink); margin:4px 0 8px; }
+@media (max-width:640px) { .oq-pick-head h1 { font-size:32px !important; } .oq-mcard p { min-height:0; } .oq-mcard q { min-height:0; } }
+/* heatmap */
+.oq-heat { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:18px 20px 14px; box-shadow:var(--shadow); overflow:hidden; }
+.oq-heat .grid { display:grid; grid-template-rows:repeat(7, 1fr); grid-auto-flow:column; grid-auto-columns:minmax(0, 1fr); gap:4px; }
+.oq-heat .grid i { display:block; aspect-ratio:1; border-radius:3px; background:var(--surface2); max-width:22px; animation:oq-fade .5s ease both; }
+.oq-heat .grid i.l1 { background:color-mix(in srgb, var(--primary) 28%, var(--surface2)); }
+.oq-heat .grid i.l2 { background:color-mix(in srgb, var(--primary) 55%, var(--surface2)); }
+.oq-heat .grid i.l3 { background:var(--primary); } .oq-heat .grid i.today { outline:2px solid var(--brass); outline-offset:1px; }
+.oq-heat .grid i.out { visibility:hidden; }
+.oq-heat .wrap { display:grid; grid-template-columns:28px 1fr; gap:8px; }
+.oq-heat .days { display:grid; grid-template-rows:repeat(7, 1fr); gap:4px; font-size:10.5px; color:var(--muted); align-items:center; }
+.oq-heat .months { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0, 1fr); gap:4px; margin:0 0 6px 36px; font-size:10.5px; color:var(--muted); }
+.oq-heat .foot { display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:12px; color:var(--muted); }
+.oq-heat .key { display:flex; gap:4px; align-items:center; } .oq-heat .key i { width:11px; height:11px; border-radius:3px; display:inline-block; background:var(--surface2); }
+.oq-heat .key i.l1 { background:color-mix(in srgb, var(--primary) 28%, var(--surface2)); } .oq-heat .key i.l2 { background:color-mix(in srgb, var(--primary) 55%, var(--surface2)); }
+.oq-heat .key i.l3 { background:var(--primary); }
+/* chart cards */
+[data-testid="stVegaLiteChart"], .oq-radar { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px; box-shadow:var(--shadow); }
+.oq-radar svg { max-width:440px; }
+.oq-legend { display:flex; flex-wrap:wrap; gap:6px 14px; margin:10px 2px 0; font-size:12px; color:var(--sub); }
+.oq-legend span { display:inline-flex; align-items:center; gap:6px; } .oq-legend i { width:9px; height:9px; border-radius:50%; display:inline-block; }
+.oq-badges { display:flex; flex-wrap:wrap; gap:8px; }
+.oq-badge { display:inline-flex; gap:8px; align-items:center; padding:8px 12px 8px 8px; border:1px solid var(--line); border-radius:999px; background:var(--surface);
+  font-size:13px; color:var(--ink); box-shadow:var(--shadow); }
+.oq-badge b { width:24px; height:24px; border-radius:50%; display:grid; place-items:center; background:var(--brass-soft); color:var(--brass-ink); }
+/* chat */
+.oq-chat-head { display:flex; align-items:center; gap:10px; margin:22px 0 10px; padding-top:16px; border-top:1px solid var(--line); font-family:inherit; }
+.oq-chat-head svg.oq-m { width:40px !important; height:auto; flex-shrink:0; }
+.oq-chat-head b { display:block; font-family:'Fraunces',serif; font-weight:500; font-size:17px; color:var(--ink); }
+.oq-chat-head span { display:block; font-size:12px; color:var(--muted); }
+.oq-chat-head .live { margin-left:auto; width:8px; height:8px; border-radius:50%; background:var(--good); box-shadow:0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+.oq-thread { display:flex; flex-direction:column; gap:10px; padding:2px; }
+.oq-msg { max-width:88%; padding:10px 13px; font-size:13.5px; line-height:1.5; border-radius:16px; animation:oq-in .3s var(--ease) both; word-wrap:break-word; }
+.oq-msg.a { align-self:flex-start; background:var(--surface); border:1px solid var(--line); color:var(--ink); border-bottom-left-radius:4px; }
+.oq-msg.u { align-self:flex-end; background:var(--primary); color:var(--on-primary); border-bottom-right-radius:4px; }
+.oq-msg .who { display:block; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; opacity:.6; margin-bottom:3px; }
+.st-key-chat_box { background:var(--surface2); border:1px solid var(--line); border-radius:16px; padding:10px; }
+[data-testid="stSidebar"] [data-testid="stForm"] { display:flex; gap:8px; }
+[data-testid="stSidebar"] [data-testid="stForm"] input { border-radius:999px !important; padding-left:14px !important; }
+[data-testid="stSidebar"] [data-testid="stFormSubmitButton"] button { border-radius:999px !important; background:var(--primary) !important; color:var(--on-primary) !important; border:none !important; }
+/* review */
+.oq-revhead { display:flex; gap:10px; align-items:center; color:var(--muted); font-size:13px; margin:-4px 0 6px; }
+.oq-revhead .dot { width:3px; height:3px; border-radius:50%; background:var(--muted); }
+details.oq-rev { background:var(--surface); border:1px solid var(--line); border-radius:14px; margin:10px 0; box-shadow:var(--shadow); overflow:hidden; }
+details.oq-rev summary { list-style:none; cursor:pointer; display:grid; grid-template-columns:30px 1fr auto; gap:12px; align-items:center; padding:16px 18px; }
+details.oq-rev summary::-webkit-details-marker { display:none; }
+details.oq-rev .n { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:600; }
+details.oq-rev.good .n { background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good); }
+details.oq-rev.kind .n { background:color-mix(in srgb, var(--kind) 16%, transparent); color:var(--kind); }
+details.oq-rev .q { color:var(--ink); font-size:15px; line-height:1.45; }
+details.oq-rev .chev { color:var(--muted); transition:transform .25s var(--ease); }
+details.oq-rev[open] .chev { transform:rotate(180deg); }
+details.oq-rev .body { padding:0 18px 18px 60px; }
+details.oq-rev .said { font-family:'Fraunces',serif; font-style:italic; color:var(--sub); font-size:14px; margin:12px 0 0; }
+details.oq-rev .yours { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:2px 0 6px; }
+@media (max-width:640px) { details.oq-rev .body { padding:0 14px 14px; } }
+.oq-summary .fig { position:absolute; right:18px; top:10px; width:150px; } .oq-summary .fig svg { width:150px !important; height:auto; }
+@media (max-width:640px) { .oq-summary .fig { position:static; margin:-6px auto 0; } }
+.oq-qhead { display:flex; align-items:center; justify-content:space-between; }
+@media (max-width:640px) { .st-key-login_card { margin-top:56px; padding:0 20px 20px; border-radius:20px; } .oq-hero.login .oneq-avatar { width:120px !important; } .oq-hero.login h1 { font-size:26px !important; } }
 </style>
 """
 
@@ -386,7 +588,8 @@ def css(theme: str = DEFAULT_THEME) -> str:
     if t["base"] == "dark":
         vars_ += " :root { color-scheme: dark; }"
     vars_ += " :root{--spring:cubic-bezier(.34,1.56,.64,1);--ease:cubic-bezier(.2,.7,.2,1);}"
-    return _CSS.replace("__VARS__", vars_)
+    from .mascots import CSS as MCSS
+    return _CSS.replace("__VARS__", vars_).replace("__MASCOTCSS__", MCSS)
 
 
 CSS = css()
@@ -528,6 +731,53 @@ LIVE_JS = """
       if (b) { b.click(); e.preventDefault(); }
     }
   });
+  // Login / first run: 1Q reacts live to the title being typed. Rules come from avatar.role_react_js_rules().
+  D.addEventListener('input', e => {
+    const inp = e.target; if (!inp.closest || !inp.closest('.st-key-login_role')) return;
+    const hero = D.querySelector('.oq-hero.login'); if (!hero) return;
+    const line = hero.querySelector('.oq-bubble p'), svg = hero.querySelector('svg.oneq-avatar');
+    const rules = JSON.parse(hero.dataset.rules || '[]'), v = ' ' + inp.value.toLowerCase().trim() + ' ';
+    clearTimeout(hero._rt);
+    if (svg) { svg.dataset.react = 'think'; }
+    if (line && v.trim().length < 3) { line.textContent = hero.dataset.typing; return; }
+    hero._rt = setTimeout(() => {
+      const hit = rules.find(r => r[0].some(k => v.includes(k))) || [[], hero.dataset.fallback, 'happy'];
+      if (line) { line.textContent = hit[1]; line.parentElement.classList.remove('pop'); void line.offsetWidth; line.parentElement.classList.add('pop'); }
+      if (svg) { svg.dataset.react = hit[2] === 'cheering' ? 'joy' : 'think'; svg.classList.remove('react'); void svg.getBBox(); svg.classList.add('react');
+        svg.classList.add('talking'); setTimeout(() => svg.classList.remove('talking'), 900); }
+    }, 260);
+  }, true);
+  // ---- the five selectable mascots (svg.oq-m): pupils follow the pointer, clicks tickle, typing reacts.
+  const setX = (m, x) => { m.classList.forEach(c => c.startsWith('x-') && m.classList.remove(c)); m.classList.add('x-' + x); };
+  function eyes(){
+    D.querySelectorAll('svg.oq-m').forEach(m => {
+      if (m.classList.contains('x-thinking') || m.classList.contains('x-sleepy')) return;
+      const r = m.getBoundingClientRect(); if (!r.width) return;
+      const dx = px - (r.left + r.width/2), dy = py - (r.top + r.height*.42), d = Math.hypot(dx, dy) || 1, k = Math.min(1, d/300) * 3.4;
+      m.querySelectorAll('.pupil').forEach(p => p.style.transform = `translate(${(dx/d*k).toFixed(2)}px,${(dy/d*k).toFixed(2)}px)`);
+    });
+    if (!reduce) W.requestAnimationFrame(eyes);
+  }
+  D.addEventListener('click', e => {
+    const m = e.target.closest && e.target.closest('svg.oq-m'); if (!m) return;
+    const back = m.dataset.expr || 'happy'; setX(m, 'ticklish'); clearTimeout(m._tk);
+    m._tk = setTimeout(() => setX(m, back), 1500);
+    const now = Date.now(); clicks = clicks.filter(t => now - t < 1200); clicks.push(now);
+    const btn = [...D.querySelectorAll('button')].find(b => (b.innerText||'').trim() === 'Poke 1Q');
+    if (btn && clicks.length >= 2) { clicks = []; btn.click(); return; }
+    const hero = m.closest('.oq-hero'); const pokes = hero && hero.dataset.pokes;
+    if (!btn && pokes) { const list = JSON.parse(pokes), line = hero.querySelector('.oq-line');
+      hero._pi = ((hero._pi ?? -1) + 1) % list.length; if (line) line.textContent = list[hero._pi]; }
+  });
+  D.addEventListener('input', e => {
+    const inp = e.target; if (!inp.closest || !inp.closest('.st-key-login_role')) return;
+    const hero = D.querySelector('.oq-hero.login'), m = hero && hero.querySelector('svg.oq-m'); if (!m) return;
+    const rules = JSON.parse(hero.dataset.rules || '[]'), v = ' ' + inp.value.toLowerCase().trim() + ' ';
+    setX(m, 'thinking'); clearTimeout(m._rt);
+    m._rt = setTimeout(() => { const hit = rules.find(r => r[0].some(k => v.includes(k)));
+      setX(m, v.trim().length < 3 ? 'thinking' : (hit && hit[2] === 'cheering') ? 'cheering' : 'happy'); }, 300);
+  }, true);
+  if (!reduce) W.requestAnimationFrame(eyes);
   wake(D); if (!reduce) { W.requestAnimationFrame(frame); setTimeout(blink, 1800); }
 })();
 </script>
@@ -572,9 +822,9 @@ def stats(items) -> str:
     return f'<div class="oq-stats">{cells}</div>'
 
 
-def summary(points: int, streak: int, title: str, extra: str = "") -> str:
+def summary(points: int, streak: int, title: str, extra: str = "", figure: str = "") -> str:
     """End-of-day moment. Private to the user, and still no right or wrong counts."""
-    return (f'<div class="oq-summary"><div class="oq-eyebrow">{icon("spark", 12)} Set complete</div>'
+    return (f'<div class="oq-summary">{f"<div class=fig>{figure}</div>" if figure else ""}<div class="oq-eyebrow">{icon("spark", 12)} Set complete</div>'
             f'<h2 class="oq-display">That is today done.</h2><p>A fresh twelve unlocks at midnight, your time.</p>'
             + stats([("points", "Points today", points, "pts"), ("flame", "Streak", streak, "days"),
                      ("trophy", "Title", title, "")]) + extra + '</div>')
@@ -610,8 +860,8 @@ def period_vars(period: str, theme: str) -> str:
 
 def hero(svg: str, title: str, line: str, sub: str = "", pokes: list[str] | None = None) -> str:
     data = f" data-pokes='{esc(json.dumps(pokes))}'" if pokes else ""
-    return (f'<div class="oq-hero"{data}>{svg}<div style="flex:1">'
-            f'{f"<div class=oq-eyebrow>{esc(sub)}</div>" if sub else ""}<h1>{esc(title)}</h1>'
+    return (f'<div class="oq-hero main"{data}><div class="oq-stage hero"><span class="halo"></span><span class="floor"></span>{svg}</div>'
+            f'<div class="oq-copy">{f"<div class=oq-eyebrow>{esc(sub)}</div>" if sub else ""}<h1>{esc(title)}</h1>'
             f'<div class="oq-line">{esc(line)}</div></div></div>')
 
 
@@ -669,11 +919,13 @@ def share_card(name: str, streak: int, rank: int, of: int, title: str, day) -> s
             f"Today's set: complete\nCan you match my streak? Take today's 1Q.")
 
 
-def share_html(name: str, streak: int, rank: int, of: int, title: str, day) -> str:
+def share_html(name: str, streak: int, rank: int, of: int, title: str, day, figure: str = "", buddy: str = "") -> str:
     """Share card: midnight navy with a teal-to-camel rule and brass type. Streak and rank only."""
-    return (f'<div style="background:#1b2a4a;color:#f5f0e6;border-radius:12px;padding:24px;margin:16px 0;'
-            f'box-shadow:0 8px 24px rgba(27,42,74,.18)">'
-            f'<div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#c9a866">1Q · {day:%b %d}</div>'
+    fig = (f'<div style="position:absolute;right:16px;bottom:8px;width:96px">{figure}</div>' if figure else "")
+    return (f'<div style="position:relative;background:#1b2a4a;color:#f5f0e6;border-radius:16px;padding:24px 128px 24px 24px;margin:16px 0;'
+            f'box-shadow:0 8px 24px rgba(27,42,74,.18);overflow:hidden">{fig}'
+            f'<div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#c9a866">1Q · {day:%b %d}'
+            f'{" · with " + esc(buddy) if buddy else ""}</div>'
             f'<div style="font-family:Fraunces,Georgia,serif;font-size:28px;margin-top:8px">{esc(name)}</div>'
             f'<div style="color:#b8cad6;font-size:14px">{esc(title)}</div>'
             f'<div style="display:flex;gap:4px;margin:16px 0"><i style="flex:2;height:3px;background:#6fb7b3"></i>'
@@ -703,9 +955,144 @@ def radar(topics: list[dict], theme: str = DEFAULT_THEME, size: int = 320) -> st
         dots += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{col}" class="oq-rdot" style="animation-delay:{.5 + i * .05:.2f}s"><title>{esc(d["topic"])}: {d["level"]}</title></circle>'
         lx, ly = pt(i, vmax * 1.14)
         anchor = "middle" if abs(lx - c) < 8 else ("start" if lx > c else "end")
-        name = d["topic"] if len(d["topic"]) <= 16 else d["topic"][:15] + "…"
-        labels += f'<text x="{lx:.1f}" y="{ly + 4:.1f}" text-anchor="{anchor}" font-size="11" fill="{t["muted"]}">{esc(name)}</text>'
-    return (f'<div class="oq-chart oq-radar"><svg viewBox="0 0 {size} {size}" width="100%" role="img" '
+        words, l1, l2 = d["topic"].split(), "", ""
+        for wd in words:
+            if len(l1) + len(wd) < 15 and not l2:
+                l1 = (l1 + " " + wd).strip()
+            else:
+                l2 = (l2 + " " + wd).strip()
+        l2 = l2 if len(l2) <= 18 else l2[:17] + "…"
+        y0 = ly + (5 if not l2 else -3)
+        labels += (f'<text x="{lx:.1f}" y="{y0:.1f}" text-anchor="{anchor}" font-size="15" font-weight="600" fill="{t["ink"]}">{esc(l1)}'
+                   + (f'<tspan x="{lx:.1f}" dy="17">{esc(l2)}</tspan>' if l2 else "") + "</text>")
+    return (f'<div class="oq-chart oq-radar"><svg viewBox="-70 -14 {size + 140} {size + 28}" width="100%" role="img" '
             f'aria-label="Topic mastery radar">{rings}{spokes}'
             f'<polygon class="oq-rshape" points="{shape}" fill="{teal}" fill-opacity=".18" stroke="{teal}" stroke-width="2" '
             f'stroke-linejoin="round"/>{dots}{labels}</svg></div>')
+
+
+# ---------------------------------------------------------------- v3 components
+def login_hero(svg: str, title: str, line: str, sub: str = "", pokes=None, rules=None, typing: str = "") -> str:
+    """Centered sign-in hero: the mascot peeks up from behind the card and talks in a speech bubble."""
+    fallback = "Love it. I'll start gentle and grow with you."
+    data = (f" data-pokes='{esc(json.dumps(pokes or []))}' data-rules='{esc(json.dumps(rules or []))}'"
+            f" data-typing='{esc(typing)}' data-fallback='{esc(fallback)}'")
+    return (f'<div class="oq-hero login"{data}><div class="oq-stage">{svg}</div>'
+            f'<div class="oq-bubble"><p class="oq-line">{esc(line)}</p></div>'
+            f'<div class="oq-eyebrow">{esc(sub)}</div><h1>{esc(title)}</h1></div>')
+
+
+def locked_options(options: list[str], answer: int, pick: int) -> str:
+    """The four options after lock-in: the right one settles in green, a wrong pick in burgundy."""
+    rows = ""
+    for i, o in enumerate(options):
+        cls = "right" if i == answer else ("wrong" if i == pick else "")
+        mark = icon("check", 14) if i == answer else (icon("x", 14) if i == pick else "")
+        rows += (f'<div class="oq-opt {cls}" style="animation-delay:{i * .04:.2f}s"><span class="k">{"ABCD"[i]}</span>'
+                 f'<span class="t">{esc(o)}</span><span class="mk">{mark}</span></div>')
+    return f'<div class="oq-opts" role="list">{rows}</div>'
+
+
+def confetti(n: int = 26) -> str:
+    """Confetti-lite: CSS-only, one short fall in wardrobe tones, skipped under reduced motion."""
+    cols = ["#0f5257", "#a8874a", "#6e2433", "#1b2a4a", "#b8935f", "#234232"]
+    bits = "".join(f'<i style="left:{(i * 37) % 100}%;background:{cols[i % len(cols)]};animation-delay:{(i % 7) * .07:.2f}s;'
+                   f'--dx:{((i * 53) % 60) - 30}px;--r:{(i * 97) % 360}deg"></i>' for i in range(n))
+    return f'<div class="oq-confetti" aria-hidden="true">{bits}</div>'
+
+
+def skeleton(lines: int = 3) -> str:
+    return ('<div class="oq-card" aria-busy="true"><div class="oq-skel" style="height:12px;width:30%"></div>'
+            '<div class="oq-skel" style="height:22px;width:85%;margin-top:14px"></div>'
+            + "".join('<div class="oq-skel" style="height:52px;margin-top:10px"></div>' for _ in range(lines + 1))
+            + '<div class="oq-fine" style="margin-top:12px">1Q is writing today\'s questions…</div></div>')
+
+
+def table(rows: list[dict], cols: list[tuple[str, str]], empty: str = "Nothing here yet.") -> str:
+    if not rows:
+        return f'<div class="oq-empty">{icon("spark", 18)}<div>{esc(empty)}</div></div>'
+    head = "".join(f"<th>{esc(lbl)}</th>" for _, lbl in cols)
+    body = "".join("<tr>" + "".join(f"<td>{esc(r.get(k, ''))}</td>" for k, _ in cols) + "</tr>" for r in rows)
+    return f'<div class="oq-table"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
+
+
+def heading(text: str, note: str = "") -> str:
+    return f'<div class="oq-h"><h3>{esc(text)}</h3>{f"<span>{esc(note)}</span>" if note else ""}</div>'
+
+
+def empty(text: str, ic: str = "spark") -> str:
+    return f'<div class="oq-empty">{icon(ic, 18)}<div>{esc(text)}</div></div>'
+
+
+def note(text: str, ic: str = "spark") -> str:
+    return f'<div class="oq-note oq-note-i">{icon(ic, 16)}<div>{esc(text)}</div></div>'
+
+
+# ---------------------------------------------------------------- v4 components
+def picker_head(eyebrow: str, title: str, sub: str) -> str:
+    return f'<div class="oq-pick-head"><div class="oq-eyebrow">{esc(eyebrow)}</div><h1>{esc(title)}</h1><p>{esc(sub)}</p></div>'
+
+
+def mascot_card(svg: str, name: str, tagline: str, line: str, on: bool = False, compact: bool = False) -> str:
+    sel = f'<div class="sel">{icon("check", 12)}Your 1Q</div>' if on else ""
+    return (f'<div class="oq-mcard{" on" if on else ""}{" compact" if compact else ""}"><div class="st">{svg}</div>'
+            f'<h4>{esc(name)}</h4>{sel}<p>{esc(tagline)}</p>{f"<q>{esc(line)}</q>" if line else ""}</div>')
+
+
+def review_card(n: int, q: dict, ok: bool, pick: int | None, line: str) -> str:
+    """Collapsible review row: number, question, then your locked answer against the right one."""
+    right = q["options"][q["answer_index"]]
+    yours = (f'<div class="yours">You picked {"ABCD"[pick]}{" · correct" if ok else ""}</div>' if pick is not None
+             else '<div class="yours">Your pick was not recorded</div>')
+    sr = (f'<span class="sr-only">Your pick: {esc(q["options"][pick])}. </span>' if pick is not None and not ok else "")
+    opts = locked_options(q["options"], q["answer_index"], pick if pick is not None else q["answer_index"])
+    return (f'<details class="oq-rev {"good" if ok else "kind"}"{"" if ok else " open"}><summary><span class="n">{n}</span>'
+            f'<span class="q"><span class="sr-only">Q{n}. </span>{esc(q["question"])}</span>'
+            f'<span class="chev">{icon("down", 16)}</span></summary><div class="body">{yours}{sr}{opts}'
+            f'<span class="sr-only">Answer: {esc(right)}</span>'
+            f'<div class="oq-explain"><div class="oq-eyebrow">Mechanism</div><p>{esc(q["explanation"])}</p></div>'
+            f'<p class="said">{esc(line)}</p></div></details>')
+
+
+def heatmap(activity: list[dict], today, weeks: int = 18) -> str:
+    """GitHub-style calendar that always fits its card: last `weeks` weeks, Monday-first."""
+    from datetime import date as _d, timedelta
+    pts = {}
+    for r in activity:
+        d = r["day"] if isinstance(r["day"], _d) else _d.fromisoformat(str(r["day"])[:10])
+        pts[d] = pts.get(d, 0) + (r.get("points") or 0)
+    start = today - timedelta(days=today.weekday() + 7 * (weeks - 1))
+    mx = max([v for v in pts.values()] + [1])
+    cells, months, last_m = "", "", None
+    for w in range(weeks):
+        wk = start + timedelta(days=7 * w)
+        months += f"<span>{wk:%b}</span>" if wk.month != last_m else "<span></span>"
+        last_m = wk.month
+        for i in range(7):
+            d = wk + timedelta(days=i)
+            v = pts.get(d, 0)
+            lv = 0 if v <= 0 else 1 if v < mx * .34 else 2 if v < mx * .67 else 3
+            cls = ("out" if d > today else f"l{lv}") + (" today" if d == today else "")
+            cells += f'<i class="{cls}" style="animation-delay:{w * .015:.3f}s" title="{d:%b %d}: {v} pts"></i>'
+    days = "".join(f"<span>{x}</span>" for x in ["Mon", "", "Wed", "", "Fri", "", ""])
+    active = sum(1 for v in pts.values() if v > 0)
+    return (f'<div class="oq-heat"><div class="months">{months}</div><div class="wrap"><div class="days">{days}</div>'
+            f'<div class="grid">{cells}</div></div><div class="foot"><span>{active} active day{"s" if active != 1 else ""}</span>'
+            f'<span class="key">Less <i></i><i class="l1"></i><i class="l2"></i><i class="l3"></i> More</span></div></div>')
+
+
+def legend(rows: list[dict]) -> str:
+    return '<div class="oq-legend">' + "".join(f'<span><i style="background:{r["color"]}"></i>{esc(r["topic"])}</span>' for r in rows) + "</div>"
+
+
+def badges(names: list[str]) -> str:
+    if not names:
+        return empty("No badges yet. Finish a set and the first one shows up here.", "trophy")
+    return '<div class="oq-badges">' + "".join(f'<span class="oq-badge"><b>{icon("trophy", 13)}</b>{esc(n.replace("_", " ").title())}</span>'
+                                               for n in names) + "</div>"
+
+
+def chat_thread(hist: list[dict], user_name: str = "You") -> str:
+    out = "".join(f'<div class="oq-msg {"a" if m["role"] == "assistant" else "u"}"><span class="who">'
+                  f'{"1Q" if m["role"] == "assistant" else "You"}</span>{esc(m["content"])}</div>' for m in hist)
+    return f'<div class="oq-thread">{out}</div>'

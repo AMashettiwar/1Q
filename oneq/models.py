@@ -24,6 +24,7 @@ class User(Base):
     shields: Mapped[int] = mapped_column(Integer, default=0)
     unlocked_json: Mapped[str] = mapped_column(Text, default="[]")
     equipped: Mapped[str] = mapped_column(String(40), default="")
+    mascot: Mapped[str | None] = mapped_column(String(20), nullable=True)  # None until the user picks one
     title: Mapped[str] = mapped_column(String(60), default="Curious Cell")
     reminder_opt_in: Mapped[bool] = mapped_column(Boolean, default=True)
     last_reminded: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -66,6 +67,7 @@ class Answer(Base):
     correct: Mapped[bool] = mapped_column(Boolean)
     is_placement: Mapped[bool] = mapped_column(Boolean, default=False)
     elapsed_ms: Mapped[int] = mapped_column(Integer, default=0)
+    choice: Mapped[int | None] = mapped_column(Integer, nullable=True)  # the option the user locked in
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
 
 

@@ -38,9 +38,15 @@ def test_full_flow(db, monkeypatch):
         at.text_input(key="login_email").input("tester@1cell.ai")
         _click(at, "login_btn")
         assert not at.exception
-        # onboarding
-        at.selectbox[0].select("PhD scientist")
-        at.button[0].click().run()
+        # first run: pick a mascot (five live cards)
+        assert len([b for b in at.button if (b.key or "").startswith("pick_")]) == 5
+        _click(at, "pick_mito")
+        assert not at.exception
+        # onboarding (role not given at sign-in): typed-or-picked title, 1Q reacts
+        assert at.button(key="ob_start").disabled
+        at.text_input(key="login_role").input("PhD scientist").run()
+        assert any("fellow scientist" in m.value for m in at.markdown)
+        _click(at, "ob_start")
         assert not at.exception
         # placement: 5 questions
         for i in range(5):
@@ -70,7 +76,7 @@ def test_full_flow(db, monkeypatch):
             assert not [x for x in at.radio if x.key and x.key.startswith("ans_")]  # locked
             _click(at, "next_q")
         md = " ".join(m.value for m in at.markdown)
-        assert "set is done" in md and "review" in " ".join(h.value for h in at.subheader)
+        assert "Today" in md and "done" in md and "review" in " ".join(h.value for h in at.subheader)
         assert md.count("Q12.") >= 1 and md.count("Q1.") >= 1  # final review lists every question
         # poke the avatar a few times
         for _ in range(4):

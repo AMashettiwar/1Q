@@ -191,12 +191,19 @@ def answered_today(s, u: User, today: date) -> dict[str, bool]:
     return {a.question_id: a.correct for a in rows}
 
 
+def picks_today(s, u: User, today: date) -> dict[str, int]:
+    """Which option the user locked in for each of today's questions."""
+    rows = s.scalars(select(Answer).where(Answer.user_id == u.id, Answer.day == today,
+                                          Answer.is_placement.is_(False))).all()
+    return {a.question_id: a.choice for a in rows if a.choice is not None}
+
+
 def record_answer(s, u: User, q: dict, chosen: int, today: date, elapsed_ms: int = 0,
                   placement: bool = False) -> bool:
     correct = int(chosen) == int(q["answer_index"])
     s.add(Answer(user_id=u.id, day=today, question_id=q["id"] if not placement else q["concept_id"],
                  concept_id=q["concept_id"], subtopic=q["subtopic"], correct=correct,
-                 is_placement=placement, elapsed_ms=int(elapsed_ms)))
+                 is_placement=placement, elapsed_ms=int(elapsed_ms), choice=int(chosen)))
     if placement:
         s.flush()
         return correct

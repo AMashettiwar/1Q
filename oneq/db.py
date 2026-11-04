@@ -25,6 +25,7 @@ def get_engine(url: str | None = None):
             kwargs["connect_args"] = {"check_same_thread": False}
         eng = create_engine(url, **kwargs)
         Base.metadata.create_all(eng)
+        _add_missing_columns(eng)
         _engines[url] = (eng, sessionmaker(bind=eng, expire_on_commit=False))
     return _engines[url]
 
@@ -45,3 +46,15 @@ def session(url: str | None = None):
         raise
     finally:
         s.close()
+
+
+def _add_missing_columns(eng):
+    """Tiny forward-only migration for columns added after a table already exists."""
+    from sqlalchemy import inspect, text
+    wanted = [("answers", "choice", "INTEGER"),
+              ("users", "mascot", "VARCHAR(20) DEFAULT 'mal'")]  # existing users keep going with Mal
+    insp = inspect(eng)
+    for table, col, ddl in wanted:
+        if col not in {c["name"] for c in insp.get_columns(table)}:
+            with eng.begin() as c:
+                c.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}"))

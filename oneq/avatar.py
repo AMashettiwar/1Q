@@ -60,6 +60,7 @@ def svg(expression: str = "happy", accessory: str = "", energy: int = 100, size:
     e = expression if expression in _EYES else "happy"
     op = 0.62 + 0.38 * max(0, min(100, energy)) / 100
     fill = lambda t: t.replace("{eye}", eye).replace("{brass}", brass)
+    gid = f"{abs(hash((body, size))) % 99991}"
     burst = "".join(
         f'<line x1="{60 + 48 * c:.1f}" y1="{60 + 48 * s_:.1f}" x2="{60 + 56 * c:.1f}" y2="{60 + 56 * s_:.1f}"/>'
         for c, s_ in [(1, 0), (.5, .866), (-.5, .866), (-1, 0), (-.5, -.866), (.5, -.866)])
@@ -70,11 +71,23 @@ def svg(expression: str = "happy", accessory: str = "", energy: int = 100, size:
         f'<ellipse class="m-shadow" cx="60" cy="116" rx="26" ry="3.5" fill="{body}" opacity=".16"/>'
         f'<g class="m-orbit"><ellipse cx="60" cy="60" rx="56" ry="20" fill="none" stroke="{brass}" stroke-width="1.2" '
         f'stroke-opacity=".6" transform="rotate(-18 60 60)"/><circle cx="113" cy="46" r="2.6" fill="{brass}"/></g>'
+        f'<defs><radialGradient id="oqL{gid}" cx=".32" cy=".26" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".30"/>'
+        f'<stop offset=".55" stop-color="#fff" stop-opacity="0"/></radialGradient>'
+        f'<radialGradient id="oqD{gid}" cx=".62" cy=".78" r=".7"><stop offset=".35" stop-color="#000" stop-opacity="0"/>'
+        f'<stop offset="1" stop-color="#000" stop-opacity=".30"/></radialGradient></defs>'
         f'<g class="m-rig"><g class="m-body">'
+        f'<g class="m-hand l"><ellipse cx="22" cy="74" rx="8" ry="7" fill="{body}"/><ellipse cx="22" cy="74" rx="8" ry="7" fill="url(#oqL{gid})"/>'
+        f'<ellipse cx="22" cy="74" rx="8" ry="7" fill="none" stroke="{brass}" stroke-opacity=".5"/></g>'
+        f'<g class="m-hand r"><ellipse cx="98" cy="74" rx="8" ry="7" fill="{body}"/><ellipse cx="98" cy="74" rx="8" ry="7" fill="url(#oqL{gid})"/>'
+        f'<ellipse cx="98" cy="74" rx="8" ry="7" fill="none" stroke="{brass}" stroke-opacity=".5"/></g>'
         f'<circle cx="60" cy="60" r="40" fill="{body}" opacity="{op:.2f}"/>'
+        f'<circle cx="60" cy="60" r="40" fill="url(#oqD{gid})"/><circle cx="60" cy="60" r="40" fill="url(#oqL{gid})"/>'
+        f'<g fill="{eye}" opacity=".10"><circle cx="40" cy="80" r="2.2"/><circle cx="84" cy="84" r="1.6"/><circle cx="76" cy="90" r="2.6"/>'
+        f'<circle cx="36" cy="58" r="1.4"/></g>'
+        f'<path d="M88 78 a40 40 0 0 1 -30 21" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="2" stroke-linecap="round"/>'
         f'<circle cx="60" cy="60" r="40" fill="none" stroke="{brass}" stroke-opacity=".45"/>'
-        f'<circle cx="78" cy="38" r="8" fill="{eye}" opacity=".12"/>'
-        f'<path d="M34 44 q8 -14 22 -18" fill="none" stroke="{eye}" stroke-opacity=".16" stroke-width="2" stroke-linecap="round"/>'
+        f'<ellipse cx="45" cy="36" rx="9" ry="5.5" fill="#fff" opacity=".32" transform="rotate(-30 45 36)"/>'
+        f'<circle cx="54" cy="31" r="2" fill="#fff" opacity=".5"/>'
         f'<g class="m-face" stroke="{eye}" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">'
         f'<g class="m-eyes">{fill(_EYES[e])}</g><g class="m-mouth">{fill(_MOUTH[e])}</g>'
         f'<g class="m-cheeks" stroke="none" fill="{brass}" opacity="0"><circle cx="38" cy="66" r="4"/><circle cx="82" cy="66" r="4"/></g></g>'
@@ -503,3 +516,69 @@ def all_lines() -> list[str]:
     for v in LOGIN_LINES.values():
         out += v
     return out + LOGIN_POKES
+
+
+# ---------------------------------------------------------------- live role reaction (login / first run)
+# 1Q reacts to whatever title someone types. Keyword rules only (instant, no LLM), so it also runs in the browser.
+ROLE_REACT = {
+    "ceo": ("A CEO! Twelve questions, zero board slides. Deal?", "cheering"),
+    "cto": ("A CTO! Biology is the oldest tech stack. Let's read its source code.", "cheering"),
+    "intern": ("An intern! Best title for learning. I'll start friendly and level up with you.", "happy"),
+    "executive": ("A leader! I'll keep it crisp and strategic. Like a good memo.", "cheering"),
+    "regulatory": ("Regulatory! Every answer I give comes with a paper trail. Promise.", "happy"),
+    "clinical": ("Clinical brain detected. I'll bring the mechanisms, you bring the instincts.", "happy"),
+    "computational": ("A data person! My priors just updated in your favor.", "happy"),
+    "wet-lab": ("Bench scientist! I can smell the 70% ethanol from here. Respectfully.", "happy"),
+    "engineering": ("An engineer! Think of a cell as legacy code with amazing uptime.", "happy"),
+    "science": ("A fellow scientist. I'll skip the warm-up and go straight to mechanisms.", "cheering"),
+    "operations": ("Ops! The real reason the freezers stay cold. Huge respect.", "happy"),
+    "business": ("Business side! I'll translate the biology into plain, useful English.", "happy"),
+    "general": ("Nice to meet you! I'll start gentle and grow with you.", "happy"),
+}
+ROLE_TYPING = ("Ooh, typing… I'm guessing scientist. Or wizard.", "thinking")
+
+
+def role_reaction(role: str | None) -> tuple[str, str]:
+    """(line, expression) for a typed title, from keyword rules only."""
+    from . import persona
+    r = f" {(role or '').strip().lower()} "
+    if not r.strip():
+        return ("", "happy")
+    if any(k in r for k in (" ceo ", "chief executive", "founder")):
+        return ROLE_REACT["ceo"]
+    if any(k in r for k in (" cto ", "chief technology")):
+        return ROLE_REACT["cto"]
+    if any(k in r for k in ("intern", "student", "trainee")):
+        return ROLE_REACT["intern"]
+    fn = persona._rule(r, persona.FUNCTION_RULES) or "general"
+    return ROLE_REACT[fn]
+
+
+def role_react_js_rules() -> list:
+    """Same rules, serialised for the browser: [[keywords], line, expression] in priority order."""
+    from . import persona
+    rules = [[[" ceo ", "chief executive", "founder"], *ROLE_REACT["ceo"]],
+             [[" cto ", "chief technology"], *ROLE_REACT["cto"]],
+             [["intern", "student", "trainee"], *ROLE_REACT["intern"]]]
+    rules += [[list(kws), *ROLE_REACT[fn]] for fn, kws in persona.FUNCTION_RULES]
+    return rules
+
+
+# ---------------------------------------------------------------- the five mascots
+# Each user picks a character (User.mascot); every character shares the same role-aware line banks.
+def mascot_key(k: str | None) -> str:
+    from . import mascots
+    return mascots.key(k)
+
+
+def react_line(role: str | None, kind: str, mascot: str | None = None, rng: random.Random | None = None) -> str:
+    """Quiz reaction from the shared role-adaptive banks (same for every mascot)."""
+    r = rng or random
+    return role_line(role, kind, r) if r.random() < .6 else pick(CORRECT if kind == "right" else WRONG, r)
+
+
+def render(expression: str = "happy", accessory: str = "", energy: int = 100, mascot: str | None = None,
+           size: int | None = None, **_) -> str:
+    """The user's chosen character in the given expression."""
+    from . import mascots
+    return mascots.svg(mascot, expression, size)

@@ -11,7 +11,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from oneq import adaptive, auth, avatar, chat, llm, persona, quiz_engine as qe, roles as roles_cfg, ui
+from oneq import adaptive, auth, avatar, chat, llm, mascots, persona, quiz_engine as qe, roles as roles_cfg, ui
 from oneq.db import session
 from oneq.models import DailySet, User
 from oneq.seed_questions import SUBTOPICS
@@ -41,12 +41,13 @@ def theme() -> str:
     return t if t in ui.THEMES else ui.DEFAULT_THEME
 
 
-def mascot(expr="happy", accessory=None, energy=100):
+def mascot(expr="happy", accessory=None, energy=100, size=None):
     if accessory is None or accessory == "":
         accessory = "lab_coat"
     pal = ui.THEMES[theme()]["mascot"]
     body = ui.OUTFIT_TONES.get(accessory, ui.OUTFIT_TONES[""])[1 if theme() == "ink" else 0]
-    return avatar.svg(expr, accessory, energy, palette=(body, pal[1], pal[2]), react_id=SS.get("react_id", 0))
+    kw = {"size": size} if size else {}
+    return avatar.render(expr, accessory, energy, mascot=SS.get("mascot"), **kw)
 
 
 def say(text: str, expr: str = "happy"):
@@ -56,15 +57,46 @@ def say(text: str, expr: str = "happy"):
 
 
 # ---------------------------------------------------------------- sign-in
-def sign_in() -> str | None:
-    if SS.get("email"):
-        return SS["email"]
-    mode = auth.auth_mode()
+QUICK_ROLES = ["Intern", "Software engineer", "Wet-lab scientist", "PhD scientist", "Bioinformatician",
+               "Clinical scientist", "Operations", "CTO", "CEO"]
+
+
+def _pill_to_role():
+    if SS.get("role_pill"):
+        SS["login_role"] = SS["role_pill"]
+
+
+def role_field():
+    """Typed-or-picked title. 1Q reacts live in the browser while it is typed (see ui.LIVE_JS)."""
+    st.text_input("What do you do at 1cell.ai?", key="login_role", max_chars=60,
+                  placeholder="Any title works, e.g. Spatial omics scientist, CTO, intern")
+    st.pills("Quick pick", QUICK_ROLES, key="role_pill", on_change=_pill_to_role, label_visibility="collapsed")
+    return (SS.get("login_role") or "").strip()[:60]
+
+
+def login_hero(known):
     tz = getattr(st.context, "timezone", None) or "UTC"
     try:
         now = datetime.now(ZoneInfo(tz)).replace(tzinfo=None)
     except Exception:  # noqa: BLE001
         now = datetime.now()
+    role = (SS.get("login_role") or "").strip()
+    line, expr = avatar.role_reaction(role) if role and not known else ("", "happy")
+    if not line:
+        line = avatar.login_line(now, known) if known else f"{avatar.login_line(now)} Tell me who you are and I'll pitch today's twelve just right."
+    if known:
+        expr = "cheering"
+    title = f"Welcome back, {known['name']}" if known else "Hello. I'm 1Q."
+    peek = mascot(expr).replace('class="m oq-m', 'class="m oq-m peek', 1)
+    st.markdown(ui.login_hero(peek, title, line, "Twelve questions a day · built for 1cell.ai",
+                              pokes=avatar.LOGIN_POKES, rules=avatar.role_react_js_rules(),
+                              typing=avatar.ROLE_TYPING[0]), unsafe_allow_html=True)
+
+
+def sign_in() -> str | None:
+    if SS.get("email"):
+        return SS["email"]
+    mode = auth.auth_mode()
     known = None
     typed = (SS.get("login_email") or "").strip().lower()
     if typed and auth.is_allowed_email(typed):
@@ -72,78 +104,109 @@ def sign_in() -> str | None:
             k = s.query(User).filter_by(email=typed).first()
             if k and k.role:
                 known = {"name": k.display_name, "role": k.role, "streak": k.streak}
-    line = avatar.login_line(now, known) if known else (
-        f"{avatar.login_line(now)} Sign in with your 1cell.ai email and let's grow some brain cells.")
-    title = "Welcome back" if known else "1Q"
-    st.markdown(ui.hero(mascot("cheering" if known else "happy"), title, line,
-                        "Twelve questions a day. Built for 1cell.ai.", pokes=avatar.LOGIN_POKES), unsafe_allow_html=True)
-    st.html(ui.LIVE_JS, unsafe_allow_javascript=True)
-    st.write("")
-    if mode == "google":
-        g = auth.google_user()
-        if g:
-            SS["email"] = g
-            return g
-        if getattr(st.user, "is_logged_in", False):
-            st.error(f"That Google account is not a @{auth.allowed_domain()} address. Please use your work account.")
-            if st.button("Sign out"):
-                st.logout()
+                SS["mascot"] = k.mascot
+    with st.container(key="login_card"):
+        login_hero(known)
+        st.html(ui.LIVE_JS, unsafe_allow_javascript=True)
+        if mode == "google":
+            g = auth.google_user()
+            if g:
+                SS["email"] = g
+                return g
+            if getattr(st.user, "is_logged_in", False):
+                st.error(f"That Google account is not a @{auth.allowed_domain()} address. Please use your work account.")
+                if st.button("Sign out"):
+                    st.logout()
+                return None
+            st.caption("You'll tell me your role right after signing in.")
+            if st.button("Continue with Google", type="primary", width="stretch", icon=":material/login:"):
+                st.login("google") if "google" in st.secrets.get("auth", {}) else st.login()
             return None
-        if st.button("Sign in with Google", type="primary", width="stretch"):
-            st.login("google") if "google" in st.secrets.get("auth", {}) else st.login()
-        return None
 
-    email = st.text_input("Work email", placeholder=f"you@{auth.allowed_domain()}", key="login_email")
-    if mode == "demo":
-        st.caption("Demo mode: we only check the email domain. Anyone could type a colleague's address. "
-                   "Turn on Google sign-in or email codes before real use.")
-        if st.button("Enter 1Q", type="primary", width="stretch", key="login_btn"):
-            if auth.is_allowed_email(email):
-                SS["email"] = email.strip().lower()
-                st.rerun()
-            st.error(f"1Q is only open to @{auth.allowed_domain()} addresses.")
-        return None
+        email = st.text_input("Work email", placeholder=f"you@{auth.allowed_domain()}", key="login_email")
+        role = "" if known else role_field()
+        SS["pending_role"] = role
+        if mode == "demo":
+            if st.button("Enter 1Q", type="primary", width="stretch", key="login_btn"):
+                if auth.is_allowed_email(email):
+                    SS["email"] = email.strip().lower()
+                    st.rerun()
+                st.error(f"1Q is only open to @{auth.allowed_domain()} addresses.")
+            st.markdown(f'<div class="oq-fine">{ui.icon("shield", 12)} Demo sign-in checks the email domain only. '
+                        'Switch on Google or email codes before real use.</div>', unsafe_allow_html=True)
+            return None
 
-    # email_otp
-    if st.button("Email me a code", width="stretch", key="otp_send"):
-        if not auth.is_allowed_email(email):
-            st.error(f"1Q is only open to @{auth.allowed_domain()} addresses.")
-        else:
-            code, digest, exp = auth.new_otp()
-            try:
-                auth.send_email(email, "Your 1Q sign-in code", f"Your code is {code}. It expires in 10 minutes.\n\n1Q")
-                SS["otp"] = (email.strip().lower(), digest, exp)
-                st.success("Code sent. Check your inbox.")
-            except Exception as e:  # noqa: BLE001
-                st.error(f"Could not send the email: {e}")
-    if SS.get("otp"):
-        code = st.text_input("6-digit code", max_chars=6, key="otp_code")
-        if st.button("Verify", type="primary", key="otp_verify"):
-            em, digest, exp = SS["otp"]
-            if auth.check_otp(code, digest, exp):
-                SS["email"] = em
-                SS.pop("otp")
-                st.rerun()
-            st.error("That code did not match or it expired.")
+        # email_otp
+        if st.button("Email me a code", type="primary", width="stretch", key="otp_send"):
+            if not auth.is_allowed_email(email):
+                st.error(f"1Q is only open to @{auth.allowed_domain()} addresses.")
+            else:
+                code, digest, exp = auth.new_otp()
+                try:
+                    auth.send_email(email, "Your 1Q sign-in code", f"Your code is {code}. It expires in 10 minutes.\n\n1Q")
+                    SS["otp"] = (email.strip().lower(), digest, exp)
+                    st.success("Code sent. Check your inbox.")
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"Could not send the email: {e}")
+        if SS.get("otp"):
+            code = st.text_input("6-digit code", max_chars=6, key="otp_code")
+            if st.button("Verify", type="primary", key="otp_verify", width="stretch"):
+                em, digest, exp = SS["otp"]
+                if auth.check_otp(code, digest, exp):
+                    SS["email"] = em
+                    SS.pop("otp")
+                    st.rerun()
+                st.error("That code did not match or it expired.")
     return None
 
 
+# ---------------------------------------------------------------- mascot picker
+def mascot_picker(u: User, prefix: str, compact: bool = False):
+    """Five live characters; the chosen one is stored on the user and used everywhere."""
+    cur = u.mascot
+    cols = st.columns(5, gap="small")
+    for col, k in zip(cols, mascots.ORDER):
+        on = k == cur
+        with col, st.container(key=f"{prefix}_{k}_card"):
+            st.markdown(ui.mascot_card(mascots.svg(k, "happy" if not on else "cheering"), mascots.NAMES[k], mascots.TAGLINES[k],
+                                       "", on, compact), unsafe_allow_html=True)
+            if st.button("Selected" if on else f"Choose {mascots.NAMES[k].split()[-1]}", key=f"{prefix}_{k}",
+                         type="primary" if on else "secondary", width="stretch", disabled=on):
+                u.mascot = SS["mascot"] = k
+                say(f"{mascots.NAMES[k]} it is. Let's go.", "cheering")
+                st.rerun()
+
+
+def choose_mascot(s, u: User):
+    st.markdown(ui.picker_head("First things first", "Pick your 1Q.",
+                               "Your quiz buddy for every day. Swap any time in Settings."),
+                unsafe_allow_html=True)
+    st.html(ui.LIVE_JS, unsafe_allow_javascript=True)
+    mascot_picker(u, "pick")
+
+
 # ---------------------------------------------------------------- onboarding
+def _name_from_email(email: str) -> str:
+    return email.split("@")[0].replace(".", " ").replace("_", " ").title()[:60]
+
+
+def start_placement(s, u: User, role: str, name: str | None = None):
+    qe.set_role(s, u, role, name or u.display_name or _name_from_email(u.email))
+    SS["placement"] = {"results": [], "used": [], "level": adaptive.rating_to_level(u.base_rating)}
+
+
 def onboarding(s, u: User):
-    st.markdown(ui.section("onboarding", "Onboarding", theme()), unsafe_allow_html=True)
-    st.markdown(ui.hero(mascot("cheering"), "Welcome to 1Q",
-                        "Tell me who you are at 1cell.ai and I will pitch the questions at the right level.",
-                        "Takes 20 seconds. Then 5 quick placement questions."), unsafe_allow_html=True)
-    with st.form("onboard"):
-        name = st.text_input("Display name (shown on the leaderboard)", value=u.display_name)
-        role = st.selectbox("Your role at 1cell.ai", roles_cfg.role_names(), index=0)
-        other = st.text_input("If you picked Other, type your role", placeholder="e.g. Spatial omics specialist")
-        if st.form_submit_button("Start placement", type="primary", width="stretch"):
-            if role == roles_cfg.OTHER:
-                role = other.strip()[:60] or "Other"
-            qe.set_role(s, u, role, name)
-            SS["placement"] = {"results": [], "used": [], "level": adaptive.rating_to_level(u.base_rating)}
+    """Only shown when the role was not given at sign-in (Google sign-in, or left blank)."""
+    with st.container(key="login_card"):
+        login_hero(None)
+        st.html(ui.LIVE_JS, unsafe_allow_javascript=True)
+        name = st.text_input("Your name on the leaderboard", value=u.display_name or _name_from_email(u.email), key="ob_name")
+        role = role_field()
+        if st.button("Start placement", type="primary", width="stretch", key="ob_start", disabled=not role):
+            start_placement(s, u, role, name)
             st.rerun()
+        st.markdown('<div class="oq-fine">Then 5 quick placement questions. Change your role any time in My Progress.</div>',
+                    unsafe_allow_html=True)
 
 
 def placement(s, u: User):
@@ -160,10 +223,12 @@ def placement(s, u: User):
     q = P["pq"]
     st.markdown(ui.hero(mascot("thinking", energy=90), "Quick placement",
                         "No pressure. These just tell me where to start.", f"Question {n + 1} of 5"), unsafe_allow_html=True)
-    st.progress(n / 5)
-    st.markdown(f'<div class="oq-card"><h3>{ui.esc(q["question"])}</h3></div>', unsafe_allow_html=True)
-    choice = st.radio("Your answer", list(range(4)), format_func=lambda i: q["options"][i], index=None, key=f"pl_{n}")
-    if st.button("Next", type="primary", disabled=choice is None, key=f"pl_next_{n}"):
+    bar = "".join(f'<i class="{"on" if i < n else "now" if i == n else ""}"></i>' for i in range(5))
+    st.markdown(f'<div class="oq-qbar">{bar}</div><div class="oq-card"><div class="oq-eyebrow">Placement · {n + 1} of 5</div>'
+                f'<h3>{ui.esc(q["question"])}</h3></div>', unsafe_allow_html=True)
+    choice = st.radio("Your answer", list(range(4)), format_func=lambda i: q["options"][i], index=None, key=f"pl_{n}",
+                      label_visibility="collapsed")
+    if st.button("Next", type="primary", disabled=choice is None, key=f"pl_next_{n}", width="stretch"):
         ok = qe.record_answer(s, u, q, choice, today(), placement=True)
         P["results"].append([q["level"], ok])
         P["used"].append(q["concept_id"])
@@ -201,7 +266,8 @@ def avatar_panel(u_name: str, mood: dict, accessory: str, progress: float | None
         msg, expr = avatar.tickle_line(SS["tickles"])
         if SS["tickles"] % len(avatar.TICKLE) == 0:
             SS["tickles"] = 0
-    c2.caption(f"1Q says: {avatar.daily_pick(avatar.SAYS, today())}")
+    says = avatar.daily_pick(avatar.SAYS, today())
+    c2.markdown(f'<div class="oq-says">{ui.icon("spark", 13)}{ui.esc(says)}</div>', unsafe_allow_html=True)
     box.markdown(ui.hero(mascot(expr, accessory, mood["energy"]), avatar.greeting(u_name, now_local()), msg,
                          f"1Q energy {mood['energy']}%"), unsafe_allow_html=True)
 
@@ -227,13 +293,16 @@ def quiz_tab(s, u: User, ds: DailySet):
             st.rerun()  # refresh the sidebar streak and progress with the completed day
         return results(s, u, ds, qs)
 
-    st.markdown(ui.progress_ring(len(done), total), unsafe_allow_html=True)
+    cur = len(done) - (1 if fb else 0)
+    bar = "".join(f'<i class="{"on" if i < len(done) else "now" if i == len(done) and not fb else ""}"></i>' for i in range(total))
+    st.markdown(f'<div class="oq-qhead">{ui.progress_ring(len(done), total)}</div><div class="oq-qbar" aria-hidden="true">{bar}</div>',
+                unsafe_allow_html=True)
     if not done:
         teaser_q, _ = avatar.daily_pick(avatar.TEASERS, today(), "teaser")
         st.markdown(f'<div class="oq-note"> <b>Today\'s cliffhanger</b><br>{ui.esc(teaser_q)}<br>'
                     '<small>Finish today\'s set to unlock the answer.</small></div>', unsafe_allow_html=True)
         if any(q.get("kind") == "boss" for q in qs):
-            st.info(avatar.FRIDAY_BOSS)
+            st.markdown(ui.note(avatar.FRIDAY_BOSS, "trophy"), unsafe_allow_html=True)
 
     if fb:
         q, good = fb["q"], fb["correct"]
@@ -244,7 +313,9 @@ def quiz_tab(s, u: User, ds: DailySet):
             body = (f"<p>You picked: {ui.esc(q['options'][fb['pick']])}</p><p> <b>Answer:</b> {ui.esc(right)}</p>"
                     f"<p>{ui.esc(q['explanation'])}</p>")
         lab = persona.EXPLAIN_LABEL[persona.profile(u.role)["seniority"]]
-        body = body.replace(f"<p>{ui.esc(q['explanation'])}</p>", f'<p><span class="oq-eyebrow" style="margin:0 6px 0 0">{lab}</span>{ui.esc(q["explanation"])}</p>')
+        body = (ui.locked_options(q["options"], q["answer_index"], fb["pick"])
+                + (f'<p class="sr-only">Answer: {ui.esc(right)}</p>' if not good else "")
+                + f'<div class="oq-explain"><div class="oq-eyebrow">{lab}</div><p>{ui.esc(q["explanation"])}</p></div>')
         verdict = (ui.icon("check", 14) + "Correct") if good else (ui.icon("spark", 14) + "Worth a second look")
         st.markdown(f'<div class="oq-card {"good" if good else "kind"}"><div class="oq-meta"><span class="oq-verdict">{verdict}</span>'
                     f'<span class="oq-eyebrow" style="margin:0">Q{fb["n"]} · locked in</span></div><h3>{ui.esc(fb["line"])}</h3>{body}</div>', unsafe_allow_html=True)
@@ -268,7 +339,7 @@ def quiz_tab(s, u: User, ds: DailySet):
     if c2.button("Hint", key=f"hint_{q['id']}", width="stretch"):
         SS.setdefault("hints", {})[q["id"]] = random.choice(avatar.HINTS)
     if SS.get("hints", {}).get(q["id"]):
-        st.caption("1Q: " + SS["hints"][q["id"]])
+        st.markdown(ui.note("1Q: " + SS["hints"][q["id"]], "spark"), unsafe_allow_html=True)
     st.markdown('<div class="oq-kbd"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> or <kbd>A</kbd>–<kbd>D</kbd> to choose,'
                 ' <kbd>Enter</kbd> to lock in</div>', unsafe_allow_html=True)
     if c1.button("Lock it in", type="primary", disabled=choice is None, width="stretch", key=f"submit_{q['id']}"):
@@ -290,9 +361,9 @@ def quiz_tab(s, u: User, ds: DailySet):
             u.soft_flags += 1
         rng = random.Random()
         if ok:
-            line = avatar.role_line(u.role, "right") if rng.random() < .6 else avatar.pick(avatar.CORRECT)
+            line = avatar.react_line(u.role, "right", u.mascot, rng)
         else:
-            line = avatar.role_line(u.role, "wrong") if rng.random() < .6 else avatar.pick(avatar.WRONG)
+            line = avatar.react_line(u.role, "wrong", u.mascot, rng)
         SS["feedback"] = {"q": q, "correct": ok, "line": line, "pick": choice, "n": idx + 1}
         if nudge:
             say(nudge, "suspicious")
@@ -311,47 +382,46 @@ def results(s, u: User, ds: DailySet, qs):
     res = SS.get("finish") or {}
     if res and not SS.get("celebrated"):
         SS["celebrated"] = True
-        if res.get("milestone") or (u.streak and u.streak % 7 == 0):
-            st.balloons()
+        SS["confetti"] = True
     _, teaser_a = avatar.daily_pick(avatar.TEASERS, today(), "teaser")
     from sqlalchemy import func, select
     from oneq.models import PointEvent
     pts = s.scalar(select(func.coalesce(func.sum(PointEvent.points), 0)).where(
         PointEvent.user_id == u.id, PointEvent.day == today())) or 0
-    st.markdown(ui.summary(int(pts), u.streak, u.title,
+    st.markdown(ui.summary(int(pts), u.streak, u.title, figure=mascot("cheering", size=150), extra=(ui.confetti() if SS.pop("confetti", False) else "") +
                            f'<div class="oq-note"><b>Cliffhanger solved.</b> {ui.esc(teaser_a)}</div>'
                            '<span class="sr-only">Today\'s set is done</span>'), unsafe_allow_html=True)
     if res.get("shields_used"):
-        st.info(f" A streak shield covered {res['shields_used']} missed weekday(s). Streak saved.")
+        st.markdown(ui.note(f"A streak shield covered {res['shields_used']} missed weekday(s). Streak saved.", "shield"), unsafe_allow_html=True)
     if res.get("shield_earned"):
-        st.success(" New streak shield earned. One free missed weekday is in your pocket.")
+        st.markdown(ui.note("New streak shield earned. One free missed weekday is in your pocket.", "shield"), unsafe_allow_html=True)
     if res.get("drop"):
         st.markdown(f'<div class="oq-note"> <b>Mystery drop:</b> {ui.esc(res["drop"]["text"])}</div>', unsafe_allow_html=True)
     for un in res.get("unlocks", []):
-        st.success(f" Unlocked: {un}")
+        st.markdown(ui.note(f"Unlocked: {un}", "spark"), unsafe_allow_html=True)
     if res.get("honest_badge"):
-        st.success(" Honest Mode badge earned: five days of solo brainpower.")
+        st.markdown(ui.note("Honest Mode badge earned: five days of solo brainpower.", "check"), unsafe_allow_html=True)
 
-    st.subheader("Today's review")
+    st.subheader("Today's review", anchor=False)
     done = qe.answered_today(s, u, today())
-    picks = {}
+    picks = qe.picks_today(s, u, today())
+    n_right = sum(1 for q in qs if done.get(q["id"]))
+    st.markdown(f'<div class="oq-revhead"><span>{len(qs)} questions</span><span class="dot"></span>'
+                f'<span>Tap any card to reread the mechanism</span></div>', unsafe_allow_html=True)
     rng = random.Random(f"{u.id}{today()}")
     for i, q in enumerate(qs):
         ok = done.get(q["id"])
         right = q["options"][q["answer_index"]]
+        mine = picks.get(q["id"])
         if ok:
-            line = avatar.role_line(u.role, "right", rng) if rng.random() < .6 else avatar.pick(avatar.CORRECT, rng)
-            body = f"<p> {ui.esc(right)}</p>"
+            line = avatar.react_line(u.role, "right", u.mascot, rng)
         else:
-            line = avatar.role_line(u.role, "wrong", rng) if rng.random() < .6 else avatar.pick(avatar.WRONG, rng)
-            mine = picks.get(q["id"])
-            yours = f"<p>Your pick: {ui.esc(q['options'][mine])}</p>" if mine is not None else ""
-            body = f"{yours}<p> <b>Answer:</b> {ui.esc(right)}</p>"
-        st.markdown(f'<div class="oq-card {"good" if ok else "kind"}"><b>Q{i + 1}. {ui.esc(q["question"])}</b>'
-                    f'<p><i>1Q: {ui.esc(line)}</i></p>{body}<p>{ui.esc(q["explanation"])}</p></div>', unsafe_allow_html=True)
+            line = avatar.react_line(u.role, "wrong", u.mascot, rng)
+        st.markdown(ui.review_card(i + 1, q, ok, mine, line), unsafe_allow_html=True)
     std = qe.standing(s, u, today())
-    st.markdown("**Share your day** (streak and rank only, no scores):")
-    st.markdown(ui.share_html(u.display_name, u.streak, std["rank"], std["of"], u.title, today()), unsafe_allow_html=True)
+    st.markdown(ui.heading("Share your day", "Streak and rank only. Never scores."), unsafe_allow_html=True)
+    st.markdown(ui.share_html(u.display_name, u.streak, std["rank"], std["of"], u.title, today(), mascot("happy", size=96),
+                              mascots.NAMES[mascots.key(u.mascot)]), unsafe_allow_html=True)
     st.code(ui.share_card(u.display_name, u.streak, std["rank"], std["of"], u.title, today()), language=None)
     st.caption("That is today's one attempt. Come back tomorrow for new material and a reworded rematch of anything that tripped you up.")
 
@@ -384,8 +454,11 @@ def leaderboard_tab(s, u: User):
 
 def _style(chart):
     t = ui.THEMES[theme()]
-    return chart.configure(background="transparent", font="Inter").configure_view(stroke=None).configure_axis(
-        labelColor=t["muted"], titleColor=t["muted"], gridColor=t["line"], domainColor=t["line2"], tickColor=t["line2"])
+    return (chart.configure(background="transparent", font="Inter", padding={"left": 4, "right": 8, "top": 8, "bottom": 4})
+            .configure_view(stroke=None)
+            .configure_axis(labelColor=t["muted"], titleColor=t["muted"], gridColor=t["line"], gridDash=[2, 4], domain=False,
+                            ticks=False, labelPadding=8, labelFontSize=11, titleFontSize=11, titleFontWeight=500, titlePadding=10)
+            .configure_legend(disable=True))
 
 
 def _mastery_chart(topics):
@@ -406,42 +479,39 @@ def progress_tab(s, u: User):
                 unsafe_allow_html=True)
     th = theme()
     if not p["topics"]:
-        st.caption("Your topic map fills in after your first set.")
+        st.markdown(ui.empty("Your topic map fills in after your first set. Twelve questions and it starts drawing itself.", "level"), unsafe_allow_html=True)
     else:
         c1, c2 = st.columns(2)
         with c1:
-            st.subheader("Mastery radar")
-            st.markdown(ui.radar(p["topics"], th) or "", unsafe_allow_html=True)
+            st.markdown(ui.heading("Mastery radar", "Where you are strong"), unsafe_allow_html=True)
+            st.markdown(ui.radar(p["topics"], th) or ui.empty("Three topics in and the radar draws itself.", "level"), unsafe_allow_html=True)
         with c2:
-            st.subheader("Topic coverage")
+            st.markdown(ui.heading("Topic coverage", "Share of your questions"), unsafe_allow_html=True)
             cov = pd.DataFrame(p["coverage"])
             if len(cov):
-                cov["color"] = [ui.tone(ui.TOPIC_TONES.get(k, "teal"), th) for k in cov["key"]]
+                cov = cov.sort_values("answered", ascending=False).reset_index(drop=True)
+                if len(cov) > 7:
+                    rest = cov.iloc[6:]
+                    cov = pd.concat([cov.iloc[:6], pd.DataFrame([{"topic": "Other", "key": "_other",
+                                    "answered": int(rest["answered"].sum())}])], ignore_index=True)
+                t_muted = ui.THEMES[th]["muted"]
+                cov["color"] = [t_muted if k == "_other" else ui.tone(ui.TOPIC_TONES.get(k, "teal"), th) for k in cov["key"]]
                 donut = alt.Chart(cov).mark_arc(innerRadius=62, outerRadius=110, cornerRadius=3, padAngle=.015).encode(
                     theta=alt.Theta("answered:Q"), color=alt.Color("color:N", scale=None),
                     order=alt.Order("answered:Q", sort="descending"), tooltip=["topic", "answered"])
                 st.altair_chart(_style(donut.properties(height=260)), width="stretch")
-                st.caption("Share of your questions per topic.")
-        st.subheader("Topic mastery")
+                st.markdown(ui.legend(cov.to_dict("records")), unsafe_allow_html=True)
+        st.markdown(ui.heading("Topic mastery", "Level 0 to 5 per topic"), unsafe_allow_html=True)
         st.altair_chart(_mastery_chart(p["topics"]), width="stretch")
     act = pd.DataFrame(p["activity"])
     if act["points"].sum() > 0:
-        st.subheader("Activity calendar")
-        act["day"] = pd.to_datetime(act["day"])
-        act["week"] = act["day"] - pd.to_timedelta(act["day"].dt.weekday, unit="D")
-        act["dow"] = act["day"].dt.strftime("%a")
-        heat = alt.Chart(act).mark_rect(cornerRadius=3, stroke=ui.THEMES[th]["bg"], strokeWidth=2).encode(
-            x=alt.X("yearmonthdate(week):O", title=None, axis=alt.Axis(format="%b %d", labelAngle=0, labelOverlap=True)),
-            y=alt.Y("dow:O", title=None, sort=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-            color=alt.Color("points:Q", legend=None, scale=alt.Scale(
-                range=[ui.THEMES[th]["surface2"], ui.tone("sage", th), ui.tone("teal", th), ui.tone("navy", th)])),
-            tooltip=[alt.Tooltip("day:T", format="%b %d"), "points"])
-        st.altair_chart(_style(heat.properties(height=180)), width="stretch")
+        st.markdown(ui.heading("Activity calendar", "Points per day"), unsafe_allow_html=True)
+        st.markdown(ui.heatmap(p["activity"], today()), unsafe_allow_html=True)
     c3, c4 = st.columns([3, 2])
     lv = pd.DataFrame(p["level_series"])
     if len(lv) >= 2:
         with c3:
-            st.subheader("Knowledge level")
+            st.markdown(ui.heading("Knowledge level", "Overall, over time"), unsafe_allow_html=True)
             lv["day"] = pd.to_datetime(lv["day"])
             base = alt.Chart(lv).encode(x=alt.X("day:T", title=None, axis=alt.Axis(format="%b %d")),
                                         y=alt.Y("level:Q", title="Level", scale=alt.Scale(zero=False)))
@@ -452,7 +522,7 @@ def progress_tab(s, u: User):
     rk = pd.DataFrame(p["rank_series"])
     if len(rk) >= 2:
         with c4:
-            st.subheader("Rank over time")
+            st.markdown(ui.heading("Rank over time", "Lower is higher"), unsafe_allow_html=True)
             rk["day"] = pd.to_datetime(rk["day"])
             spark = alt.Chart(rk).mark_line(interpolate="monotone", color=ui.tone("brass", th), strokeWidth=2.5,
                                              point=alt.OverlayMarkDef(color=ui.tone("brass", th), size=36)).encode(
@@ -460,16 +530,17 @@ def progress_tab(s, u: User):
                 y=alt.Y("rank:Q", title="Rank", scale=alt.Scale(reverse=True, zero=False), axis=alt.Axis(tickMinStep=1)))
             st.altair_chart(_style(spark.properties(height=200)), width="stretch")
             st.caption(f"Now #{int(rk['rank'].iloc[-1])}. Lower is higher on the board.")
-    st.subheader("Wardrobe and badges")
+    st.markdown(ui.heading("Badges", "Earned, never bought"), unsafe_allow_html=True)
     owned = qe.unlocked(u)
-    outfits = [""] + [k for k in avatar.ACCESSORIES if k and k in owned]
-    pick = st.selectbox("1Q outfit", outfits, index=outfits.index(u.equipped) if u.equipped in outfits else 0,
-                        format_func=lambda k: avatar.ACCESSORY_NAMES.get(k, "None"))
-    if pick != u.equipped:
-        u.equipped = pick
-    badges = [b for b in owned if b not in avatar.ACCESSORIES]
-    st.write("Badges: " + (", ".join(b.replace("_", " ").title() for b in badges) if badges else "none yet. Keep going."))
-    st.subheader("Settings")
+    badges = [b for b in owned if b not in avatar.ACCESSORIES] + [avatar.ACCESSORY_NAMES.get(k, k) for k in owned if k in avatar.ACCESSORIES and k]
+    st.markdown(ui.badges(badges), unsafe_allow_html=True)
+    st.markdown(ui.heading("Settings", "Saved as you change them"), unsafe_allow_html=True)
+    st.markdown('<div class="oq-label">Your mascot</div>', unsafe_allow_html=True)
+    mascot_picker(u, "set_mascot", compact=True)
+    nm = st.text_input("Name on the leaderboard", value=u.display_name, key="set_name", max_chars=60).strip()
+    if nm and nm != u.display_name:
+        u.display_name = nm
+        st.toast("Name updated.")
     names = roles_cfg.role_names()
     cur = u.role if u.role in names else roles_cfg.OTHER
     new_role = st.selectbox("Your role (change any time)", names, index=names.index(cur), key="set_role")
@@ -514,10 +585,8 @@ outfits and titles. Fridays have a boss round.</p>
 def admin_tab(s):
     st.markdown(ui.section("admin", "05 / Admin", theme()), unsafe_allow_html=True)
     a = qe.admin_stats(s, today())
-    c = st.columns(3)
-    c[0].metric("Users", a["users"])
-    c[1].metric("Onboarded", a["onboarded"])
-    c[2].metric("Finished today", a["today"])
+    st.markdown(ui.stats([("level", "Users", a["users"], ""), ("check", "Onboarded", a["onboarded"], ""),
+                          ("calendar", "Finished today", a["today"], "")]), unsafe_allow_html=True)
     if a["by_day"]:
         df = pd.DataFrame(a["by_day"])
         df["day"] = pd.to_datetime(df["day"]).dt.strftime("%b %d")
@@ -525,25 +594,25 @@ def admin_tab(s):
         st.altair_chart(_style(alt.Chart(df).mark_bar(cornerRadiusEnd=3, size=28, color=ui.tone("petrol", theme())).encode(
             x=alt.X("day:N", title=None, sort=None, axis=alt.Axis(labelAngle=0)), y=alt.Y(f"{ycol}:Q", title="Finished sets"),
             tooltip=["day", ycol]).properties(height=220)), width="stretch")
-    st.subheader("Soft integrity flags")
+    st.markdown(ui.heading("Soft integrity flags", "Heuristics, not proof"), unsafe_allow_html=True)
     st.caption("Heuristics only (very fast answers, machine-regular timing, copy/paste, tab switching). "
                "They cannot prove outside help. Use them to start a friendly conversation, nothing more.")
-    st.dataframe(pd.DataFrame(a["flagged"]) if a["flagged"] else pd.DataFrame(columns=["name", "email", "soft_flags"]),
-                 hide_index=True, width="stretch")
+    st.markdown(ui.table(a["flagged"], [("name", "Name"), ("email", "Email"), ("soft_flags", "Soft flags")],
+                         "No soft flags. Everyone is quizzing solo."), unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------- chat
 def chat_panel(s, u: User, ds: DailySet):
-    st.markdown(f'<div class="oq-chat-head" style="border-top:2px solid {ui.tone('peacock', theme())};padding-top:12px">Ask 1Q</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="oq-chat-head">{mascot("happy", "", 100, 34)}<div><b>Ask 1Q</b><span>Cancer biology, any depth</span></div>'
+                f'<i class="live" title="online"></i></div>', unsafe_allow_html=True)
     hist = SS.setdefault("chat", [{"role": "assistant", "content": f"Hi {u.display_name}! Ask me anything about cancer biology. "
                                    "I will not spoil a live quiz question though."}])
-    box = st.container(height=300)
-    for m in hist[-12:]:
-        box.chat_message(m["role"], avatar=":material/blur_on:" if m["role"] == "assistant" else ":material/person:").write(m["content"])
+    box = st.container(height=320, key="chat_box", border=False)
+    box.markdown(ui.chat_thread(hist[-12:], u.display_name), unsafe_allow_html=True)
     with st.form("chat_form", clear_on_submit=True, border=False):
         msg = st.text_input("Message 1Q", placeholder=f"e.g. explain CAR-T {persona.CHAT_HINT.get(persona.bucket(persona.profile(u.role)), 'simply')}",
                             label_visibility="collapsed", key="chat_msg")
-        sent = st.form_submit_button("Send", width="stretch", key="chat_send")
+        sent = st.form_submit_button("Send", width="stretch", key="chat_send", icon=":material/arrow_upward:")
     if sent and msg.strip():
         if SS.get("feedback"):
             active = None  # just answered: free to discuss
@@ -579,6 +648,11 @@ def main():
             SS["days_away"] = (today() - u.last_completed).days if u.last_completed else None
             SS["last_action"] = time.time()
         u.last_seen = now
+        SS["mascot"] = u.mascot
+        if not u.mascot:
+            return choose_mascot(s, u)
+        if not u.role and SS.get("pending_role"):
+            start_placement(s, u, SS.pop("pending_role"))
         if not u.role:
             return onboarding(s, u)
         if not u.placement_done:
@@ -589,7 +663,12 @@ def main():
             say(avatar.IDLE, "sleepy")
         SS["last_action"] = time.time()
 
+        sk = st.empty()
+        if not SS.get("set_ready"):
+            sk.markdown(ui.skeleton(), unsafe_allow_html=True)
         ds = qe.get_today_set(s, u, today())
+        SS["set_ready"] = True
+        sk.empty()
         if "greeted" not in SS:
             SS["greeted"] = True
             if (SS["days_away"] or 0) >= 2:
