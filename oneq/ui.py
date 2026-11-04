@@ -377,6 +377,11 @@ section[data-testid="stSidebar"] .oq-stat .v { font-size:clamp(16px,1.4vw,20px);
   .st-key-quiz_side { position:static; } }
 .st-key-quiz_side { position:sticky; top:72px; padding:20px; background:var(--surface); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
 .st-key-quiz_side .oq-stats { grid-template-columns:1fr 1fr !important; }
+.st-key-quiz_side { margin-top:0; gap:10px; }
+.st-key-quiz_side .oq-h { margin:2px 0 0 !important; padding:0 !important; } .st-key-quiz_side .oq-h h3 { font-size:17px !important; }
+.st-key-quiz_side .oq-stats { margin:4px 0 !important; }
+.oq-howto { margin:4px 0 0; padding-left:18px; color:var(--sub); font-size:14px; line-height:1.6; } .oq-howto li { margin:4px 0; }
+.oq-howto kbd { font-size:11px; padding:1px 5px; border:1px solid var(--line2); border-radius:4px; background:var(--surface2); }
 @media (min-width:1025px) { .st-key-share_rail { position:sticky; top:72px; } }
 .st-key-quiz_side .oq-row .who span { display:none; } .st-key-quiz_side .oq-row > * { flex-shrink:0; } .st-key-quiz_side .oq-row .who { flex:1 1 auto; min-width:0; flex-shrink:1; } .st-key-quiz_side .oq-row { padding:10px 12px; } .st-key-quiz_side .oq-row .who b { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 @media (max-width:768px) { .oq-summary { padding:24px; } div[role="tablist"] { width:100%; } }

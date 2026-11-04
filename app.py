@@ -302,7 +302,7 @@ def active_question(s, u: User, ds: DailySet) -> dict | None:
     return next((q for q in json.loads(ds.questions_json) if q["id"] not in done), None)
 
 
-def quiz_tab(s, u: User, ds: DailySet):
+def quiz_tab(s, u: User, ds: DailySet, rail: bool = False):
     st.markdown(ui.section("quiz", "01 / Today's quiz", theme()), unsafe_allow_html=True)
     qs = json.loads(ds.questions_json)
     done = qe.answered_today(s, u, today())
@@ -319,7 +319,7 @@ def quiz_tab(s, u: User, ds: DailySet):
     bar = "".join(f'<i class="{"on" if i < len(done) else "now" if i == len(done) and not fb else ""}"></i>' for i in range(total))
     st.markdown(f'<div class="oq-qhead">{ui.progress_ring(len(done), total)}</div><div class="oq-qbar" aria-hidden="true">{bar}</div>',
                 unsafe_allow_html=True)
-    if not done:
+    if not done and not rail:
         teaser_q, _ = avatar.daily_pick(avatar.TEASERS, today(), "teaser")
         st.markdown(f'<div class="oq-note"> <b>Today\'s cliffhanger</b><br>{ui.esc(teaser_q)}<br>'
                     '<small>Finish today\'s set to unlock the answer.</small></div>', unsafe_allow_html=True)
@@ -398,16 +398,20 @@ def quiz_side(s, u: User, ds: DailySet):
     """Desktop side rail next to the quiz: streak at a glance and a weekly board preview."""
     with st.container(key="quiz_side"):
         st.markdown(ui.heading("At a glance", "Today"), unsafe_allow_html=True)
-        st.markdown(ui.stats([("flame", "Streak", u.streak, "days"), ("shield", "Shields", u.shields, "")]),
+        n_done = len(qe.answered_today(s, u, today()))
+        n_q = len(json.loads(ds.questions_json))
+        st.markdown(ui.stats([("flame", "Streak", u.streak, "days"), ("shield", "Shields", u.shields, ""),
+                              ("check", "Answered", n_done, f"of {n_q}"),
+                              ("trophy", "Best streak", u.best_streak, "days")]),
                     unsafe_allow_html=True)
-        st.markdown(ui.heading("This week", "Top five"), unsafe_allow_html=True)
-        board = [r for r in qe.leaderboard(s, today(), "weekly") if r["score"] > 0]
-        if board:
-            st.markdown(ui.lb_rows(qe.top_with_me(board, u.id, 5)[:5], u.id, "weekly", theme()), unsafe_allow_html=True)
-        else:
-            st.markdown(ui.empty("No one is on the board yet this week. Finish today's set to claim first place.", "trophy"),
-                        unsafe_allow_html=True)
-        st.caption("Ranks reward showing up. Right or wrong counts are never shown.")
+        teaser_q, _ = avatar.daily_pick(avatar.TEASERS, today(), "teaser")
+        st.markdown(f'<div class="oq-note"><b>Today\'s cliffhanger</b><br>{ui.esc(teaser_q)}<br>'
+                    '<small>Finish today\'s set to unlock the answer.</small></div>', unsafe_allow_html=True)
+        st.markdown(ui.heading("How today works", ""), unsafe_allow_html=True)
+        st.markdown('<ul class="oq-howto"><li>Twelve questions, about four minutes.</li>'
+                    '<li>Each answer locks in once. Hints are free.</li>'
+                    '<li>Misses come back later as a reworded rematch.</li>'
+                    '<li>Keys <kbd>1</kbd>–<kbd>4</kbd> pick, <kbd>Enter</kbd> locks in.</li></ul>', unsafe_allow_html=True)
 
 
 def finish_day(s, u: User):
@@ -779,9 +783,9 @@ def main():
             if ds.completed:
                 quiz_tab(s, u, ds)
             else:
-                qa, qb = st.container(key="grid_quiz").columns([2.1, 1], gap="large")
+                qa, qb = st.container(key="grid_quiz").columns([2.2, 1], gap="large")
                 with qa:
-                    quiz_tab(s, u, ds)
+                    quiz_tab(s, u, ds, rail=True)
                 with qb:
                     quiz_side(s, u, ds)
         with tabs[1]:
