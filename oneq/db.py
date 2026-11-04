@@ -14,6 +14,9 @@ def _url() -> str:
     # Supabase/Heroku style URLs
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://"):]
+    # SQLAlchemy 2.1 defaults to psycopg3; we ship psycopg2, so name the driver.
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg2://" + url[len("postgresql://"):]
     return url
 
 
