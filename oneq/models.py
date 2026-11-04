@@ -101,3 +101,10 @@ class PointEvent(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     day: Mapped[date] = mapped_column(Date, index=True)
     points: Mapped[int] = mapped_column(Integer)
+
+
+class AppSecret(Base):
+    """Server-side secrets generated on first use (e.g. the remember-me signing key)."""
+    __tablename__ = "app_secrets"
+    name: Mapped[str] = mapped_column(String(40), primary_key=True)
+    value: Mapped[str] = mapped_column(String(128))

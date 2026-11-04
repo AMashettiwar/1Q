@@ -16,7 +16,7 @@ from oneq.db import session
 from oneq.models import DailySet, User
 from oneq.seed_questions import SUBTOPICS
 
-st.set_page_config(page_title="1Q · daily cancer quiz", page_icon=":material/biotech:", layout="centered")
+st.set_page_config(page_title="1Q · daily cancer quiz", page_icon=":material/biotech:", layout="wide")
 SS = st.session_state
 
 
@@ -93,10 +93,32 @@ def login_hero(known):
                               typing=avatar.ROLE_TYPING[0]), unsafe_allow_html=True)
 
 
+def _remember(email: str):
+    """After a verified sign-in (email code or demo), keep this browser signed in for 30 days."""
+    SS["email"] = email
+    SS["set_cookie"] = auth.sign_token(email)
+
+
 def sign_in() -> str | None:
     if SS.get("email"):
+        if SS.get("set_cookie"):
+            st.html(auth.cookie_js(SS.pop("set_cookie")), unsafe_allow_javascript=True)
+        if not auth.is_allowed_email(SS["email"]):  # domain re-checked on every load
+            SS.pop("email")
+            return None
         return SS["email"]
     mode = auth.auth_mode()
+    if SS.get("signed_out"):
+        st.html(auth.cookie_js(None), unsafe_allow_javascript=True)
+    elif mode in ("email_otp", "demo"):
+        try:
+            tok = st.context.cookies.get(auth.COOKIE_NAME)
+        except Exception:  # noqa: BLE001
+            tok = None
+        em = auth.verify_token(tok)
+        if em:
+            SS["email"] = em
+            return em
     known = None
     typed = (SS.get("login_email") or "").strip().lower()
     if typed and auth.is_allowed_email(typed):
@@ -129,7 +151,7 @@ def sign_in() -> str | None:
         if mode == "demo":
             if st.button("Enter 1Q", type="primary", width="stretch", key="login_btn"):
                 if auth.is_allowed_email(email):
-                    SS["email"] = email.strip().lower()
+                    _remember(email.strip().lower())
                     st.rerun()
                 st.error(f"1Q is only open to @{auth.allowed_domain()} addresses.")
             st.markdown(f'<div class="oq-fine">{ui.icon("shield", 12)} Demo sign-in checks the email domain only. '
@@ -153,7 +175,7 @@ def sign_in() -> str | None:
             if st.button("Verify", type="primary", key="otp_verify", width="stretch"):
                 em, digest, exp = SS["otp"]
                 if auth.check_otp(code, digest, exp):
-                    SS["email"] = em
+                    _remember(em)
                     SS.pop("otp")
                     st.rerun()
                 st.error("That code did not match or it expired.")
@@ -372,6 +394,22 @@ def quiz_tab(s, u: User, ds: DailySet):
         st.rerun()
 
 
+def quiz_side(s, u: User, ds: DailySet):
+    """Desktop side rail next to the quiz: streak at a glance and a weekly board preview."""
+    with st.container(key="quiz_side"):
+        st.markdown(ui.heading("At a glance", "Today"), unsafe_allow_html=True)
+        st.markdown(ui.stats([("flame", "Streak", u.streak, "days"), ("shield", "Shields", u.shields, "")]),
+                    unsafe_allow_html=True)
+        st.markdown(ui.heading("This week", "Top five"), unsafe_allow_html=True)
+        board = [r for r in qe.leaderboard(s, today(), "weekly") if r["score"] > 0]
+        if board:
+            st.markdown(ui.lb_rows(qe.top_with_me(board, u.id, 5)[:5], u.id, "weekly", theme()), unsafe_allow_html=True)
+        else:
+            st.markdown(ui.empty("No one is on the board yet this week. Finish today's set to claim first place.", "trophy"),
+                        unsafe_allow_html=True)
+        st.caption("Ranks reward showing up. Right or wrong counts are never shown.")
+
+
 def finish_day(s, u: User):
     res = qe.complete_day(s, u, today(), honest=not SS.get("flagged_today"))
     SS["finish"] = res
@@ -402,6 +440,8 @@ def results(s, u: User, ds: DailySet, qs):
     if res.get("honest_badge"):
         st.markdown(ui.note("Honest Mode badge earned: five days of solo brainpower.", "check"), unsafe_allow_html=True)
 
+    col_rev, col_share = st.container(key="grid_results").columns([1.7, 1], gap="large")
+    col_rev.__enter__()
     st.subheader("Today's review", anchor=False)
     done = qe.answered_today(s, u, today())
     picks = qe.picks_today(s, u, today())
@@ -418,11 +458,13 @@ def results(s, u: User, ds: DailySet, qs):
         else:
             line = avatar.react_line(u.role, "wrong", u.mascot, rng)
         st.markdown(ui.review_card(i + 1, q, ok, mine, line), unsafe_allow_html=True)
-    std = qe.standing(s, u, today())
-    st.markdown(ui.heading("Share your day", "Streak and rank only. Never scores."), unsafe_allow_html=True)
-    st.markdown(ui.share_html(u.display_name, u.streak, std["rank"], std["of"], u.title, today(), mascot("happy", size=96),
-                              mascots.NAMES[mascots.key(u.mascot)]), unsafe_allow_html=True)
-    st.code(ui.share_card(u.display_name, u.streak, std["rank"], std["of"], u.title, today()), language=None)
+    col_rev.__exit__(None, None, None)
+    with col_share, st.container(key="share_rail"):
+        std = qe.standing(s, u, today())
+        st.markdown(ui.heading("Share your day", "Streak and rank only. Never scores."), unsafe_allow_html=True)
+        st.markdown(ui.share_html(u.display_name, u.streak, std["rank"], std["of"], u.title, today(), mascot("happy", size=96),
+                                  mascots.NAMES[mascots.key(u.mascot)]), unsafe_allow_html=True)
+        st.code(ui.share_card(u.display_name, u.streak, std["rank"], std["of"], u.title, today()), language=None)
     st.caption("That is today's one attempt. Come back tomorrow for new material and a reworded rematch of anything that tripped you up.")
 
 
@@ -434,11 +476,16 @@ def leaderboard_tab(s, u: User):
     move = (f'<span class="oq-move up">{ui.icon("up", 12)}{mv}</span>' if mv > 0 else
             f'<span class="oq-move down">{ui.icon("down", 12)}{-mv}</span>' if mv < 0 else
             f'<span class="oq-move">{ui.icon("dash", 12)}Holding</span>')
+    la, lb = st.container(key="grid_lb").columns([1, 2.2], gap="large")
+    la.__enter__()
     st.markdown(f'<div class="oq-card toned" style="--c:{ui.tone("navy", theme())}"><div class="oq-eyebrow">Your standing</div>'
                 f'<div class="oq-standing"><div><span class="big">{ui.num(std["rank"])}</span>'
                 f'<span class="oq-small"> of {std["of"]}</span></div>{move}</div>'
                 f'<p>{ui.num(std["score"])} pts overall · since your last visit</p>'
                 f'<span class="sr-only">Your standing: #{std["rank"]} of {std["of"]}</span></div>', unsafe_allow_html=True)
+    st.caption("Score blends participation points, streak and mastery level. It never shows right or wrong counts.")
+    la.__exit__(None, None, None)
+    lb.__enter__()
     views = st.tabs(["Daily", "Weekly", "Monthly", "Overall"])
     for view, period in zip(views, qe.PERIODS):
         with view:
@@ -449,7 +496,7 @@ def leaderboard_tab(s, u: User):
             if u.id not in [r["user_id"] for r in full[:3] + rows] and period != "overall":
                 st.caption("You are not on this board yet. One finished set puts you on it.")
             st.markdown(ui.lb_rows(rows, u.id, period, theme()), unsafe_allow_html=True)
-    st.caption("Score blends participation points, streak and mastery level. It never shows right or wrong counts.")
+    lb.__exit__(None, None, None)
 
 
 def _style(chart):
@@ -501,13 +548,17 @@ def progress_tab(s, u: User):
                     order=alt.Order("answered:Q", sort="descending"), tooltip=["topic", "answered"])
                 st.altair_chart(_style(donut.properties(height=260)), width="stretch")
                 st.markdown(ui.legend(cov.to_dict("records")), unsafe_allow_html=True)
-        st.markdown(ui.heading("Topic mastery", "Level 0 to 5 per topic"), unsafe_allow_html=True)
-        st.altair_chart(_mastery_chart(p["topics"]), width="stretch")
+    m1, m2 = st.columns(2, gap="large")
+    if p["topics"]:
+        with m1:
+            st.markdown(ui.heading("Topic mastery", "Level 0 to 5 per topic"), unsafe_allow_html=True)
+            st.altair_chart(_mastery_chart(p["topics"]), width="stretch")
     act = pd.DataFrame(p["activity"])
     if act["points"].sum() > 0:
-        st.markdown(ui.heading("Activity calendar", "Points per day"), unsafe_allow_html=True)
-        st.markdown(ui.heatmap(p["activity"], today()), unsafe_allow_html=True)
-    c3, c4 = st.columns([3, 2])
+        with m2:
+            st.markdown(ui.heading("Activity calendar", "Points per day"), unsafe_allow_html=True)
+            st.markdown(ui.heatmap(p["activity"], today()), unsafe_allow_html=True)
+    c3, c4 = st.columns([3, 2], gap="large")
     lv = pd.DataFrame(p["level_series"])
     if len(lv) >= 2:
         with c3:
@@ -537,6 +588,8 @@ def progress_tab(s, u: User):
     st.markdown(ui.heading("Settings", "Saved as you change them"), unsafe_allow_html=True)
     st.markdown('<div class="oq-label">Your mascot</div>', unsafe_allow_html=True)
     mascot_picker(u, "set_mascot", compact=True)
+    sa, sb = st.columns(2, gap="large")
+    sa.__enter__()
     nm = st.text_input("Name on the leaderboard", value=u.display_name, key="set_name", max_chars=60).strip()
     if nm and nm != u.display_name:
         u.display_name = nm
@@ -549,6 +602,8 @@ def progress_tab(s, u: User):
     if new_role != u.role:
         qe.set_role(s, u, new_role)
         st.toast("Role updated. Your mastery history stays as it is.")
+    sa.__exit__(None, None, None)
+    sb.__enter__()
     zones = sorted(available_timezones())
     tz_now = u.timezone or SS.get("tz") or "UTC"
     tz = st.selectbox("Timezone (your day resets at local midnight)", zones,
@@ -562,6 +617,7 @@ def progress_tab(s, u: User):
     if rem != u.reminder_opt_in:
         u.reminder_opt_in = rem
         st.toast("Reminder settings saved.")
+    sb.__exit__(None, None, None)
 
 
 def about_tab(s, u: User):
@@ -700,6 +756,7 @@ def main():
                 st.rerun()
             if st.button("Sign out", key="signout"):
                 SS.clear()
+                SS["signed_out"] = True  # clears the remember-me cookie on the next render
                 if auth.auth_mode() == "google":
                     st.logout()
                 st.rerun()
@@ -719,7 +776,14 @@ def main():
             names.append("Admin")
         tabs = st.tabs(names)
         with tabs[0]:
-            quiz_tab(s, u, ds)
+            if ds.completed:
+                quiz_tab(s, u, ds)
+            else:
+                qa, qb = st.container(key="grid_quiz").columns([2.1, 1], gap="large")
+                with qa:
+                    quiz_tab(s, u, ds)
+                with qb:
+                    quiz_side(s, u, ds)
         with tabs[1]:
             leaderboard_tab(s, u)
         with tabs[2]:
