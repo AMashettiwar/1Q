@@ -59,6 +59,19 @@ def test_full_flow(db, monkeypatch):
         _click(at, "chat_send")
         assert not at.exception, at.exception
         assert at.session_state["chat"][-1]["content"] in __import__("oneq.chat").chat.REFUSALS
+        # a normal chat message gets a real (mocked Groq) reply
+        at.sidebar.text_input(key="chat_msg").input("explain CAR-T briefly")
+        _click(at, "chat_send")
+        assert at.session_state["chat"][-1]["content"] == "Mock 1Q says hi."
+        # the floating Ask 1Q popover shares the same thread
+        at.text_input(key="fab_chat_msg").input("what is BRCA1?")
+        _click(at, "fab_chat_send")
+        assert at.session_state["chat"][-2]["content"] == "what is BRCA1?"
+        assert at.session_state["chat"][-1]["content"] == "Mock 1Q says hi."
+        # a single progress indicator that agrees with the question
+        md0 = " ".join(m.value for m in at.markdown)
+        assert md0.count("of 12") == 1 and "Question 1 of 12" in md0
+        assert "Today: " not in " ".join(getattr(p, "text", "") or "" for p in at.sidebar)
         # daily quiz: one question at a time, answers lock, wrong answers explained right away
         for n in range(12):
             radios = [r for r in at.radio if r.key and r.key.startswith("ans_")]
@@ -74,6 +87,7 @@ def test_full_flow(db, monkeypatch):
             if wrong and "Right" in r.options:
                 assert "Answer:" in md and "Mock explanation" in md
             assert not [x for x in at.radio if x.key and x.key.startswith("ans_")]  # locked
+            assert f"Question {n + 1} of 12" in md  # ring agrees while feedback shows
             _click(at, "next_q")
         md = " ".join(m.value for m in at.markdown)
         assert "Today" in md and "done" in md and "review" in " ".join(h.value for h in at.subheader)

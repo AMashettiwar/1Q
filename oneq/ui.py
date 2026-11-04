@@ -66,12 +66,12 @@ THEMES = {
         mascot=("#0f5257", "#f5efe2", "#a8874a"), base="light"),
     # Dark: midnight navy-black with teal undertone, ivory text, brass and powder blue.
     "ink": dict(
-        bg="#0d1519", surface="#132026", surface2="#1a2a31", ink="#efe9dc", sub="#d3cdc0", muted="#a39b8c",
-        line="rgba(239,233,220,.08)", line2="rgba(239,233,220,.15)",
+        bg="#0b0f0e", surface="#121816", surface2="#18201e", ink="#f1ead9", sub="#d6cfbf", muted="#a39d8f",
+        line="rgba(241,234,217,.09)", line2="rgba(241,234,217,.16)",
         primary="#6fb7b3", primary_hi="#86c6c2", on_primary="#0b1417", secondary="#9db0d6", navy="#9db0d6",
         brass="#c9a866", brass_ink="#c9a866", brass_soft="rgba(201,168,102,.14)", focus="rgba(111,183,179,.30)",
-        good="#7fc0a3", kind="#d99a6c", camel="#d3b07e",
-        shadow="0 1px 0 rgba(255,255,255,.03) inset, 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.30)",
+        good="#7fc0a3", kind="#d98b86", camel="#d3b07e",
+        shadow="0 1px 0 rgba(255,255,255,.035) inset, 0 1px 2px rgba(0,0,0,.5), 0 12px 32px rgba(0,0,0,.45)",
         mascot=("#1f6b6b", "#efe9dc", "#c9a866"), base="dark"),
 }
 DEFAULT_THEME = "ivory"
@@ -257,7 +257,7 @@ div[data-testid="stProgress"] div[role="progressbar"] > div > div { background:v
   --e1:0 1px 2px rgba(15,25,30,.05); --e2:0 1px 2px rgba(15,25,30,.04), 0 6px 16px rgba(15,25,30,.06);
   --e3:0 2px 4px rgba(15,25,30,.05), 0 18px 40px rgba(15,25,30,.10); }
 /* hide default Streamlit chrome, keep the sidebar control */
-[data-testid="stToolbar"], [data-testid="stDecoration"], #MainMenu, footer, [data-testid="stStatusWidget"],
+[data-testid="stToolbarActions"], [data-testid="stMainMenu"], [data-testid="stDecoration"], #MainMenu, footer, [data-testid="stStatusWidget"],
 .stDeployButton, [data-testid="stAppDeployButton"] { display:none !important; }
 header[data-testid="stHeader"] { height:48px; background:transparent !important; }
 [data-testid="stHeaderActionElements"], .stMarkdown a.anchor-link, [data-testid="stHeadingWithActionElements"] a { display:none !important; }
@@ -435,7 +435,7 @@ section[data-testid="stSidebar"] .oq-stat .v { font-size:clamp(16px,1.4vw,20px);
   .st-key-quiz_col .oq-qtop .oq-qhead small, .st-key-quiz_col .oq-kbd { display:none; }
   .st-key-quiz_col .oq-card { padding:12px 14px; margin:0 0 6px; }
   .st-key-quiz_col .oq-card h3 { font-size:17px !important; margin:4px 0 0 !important; }
-  .st-key-quiz_col div[role="radiogroup"] label { padding:8px 12px !important; font-size:15px; }
+  .st-key-quiz_col div[role="radiogroup"] label { padding:8px 12px 8px 50px !important; font-size:14.5px; }
   .st-key-quiz_col .oq-opts { gap:5px; margin:8px 0 2px; } .st-key-quiz_col .oq-opt { padding:7px 10px; font-size:14px; }
   .st-key-quiz_col .oq-explain { margin-top:8px; padding:8px 12px; font-size:13.5px; }
   .st-key-lockrow [data-testid="stHorizontalBlock"] { flex-wrap:nowrap !important; gap:8px; }
@@ -663,6 +663,59 @@ details.oq-rev .yours { font-size:12px; letter-spacing:.08em; text-transform:upp
 @media (max-width:640px) { .oq-summary .fig { position:static; margin:-6px auto 0; } }
 .oq-qhead { display:flex; align-items:center; justify-content:space-between; }
 @media (max-width:640px) { .st-key-login_card { margin-top:56px; padding:0 20px 20px; border-radius:20px; } .oq-hero.login .oneq-avatar { width:120px !important; } .oq-hero.login h1 { font-size:26px !important; } }
+
+section[data-testid="stSidebar"] .oq-sbrole { font-family:'Fraunces',serif; font-size:18px; color:var(--ink); margin:4px 0 12px; }
+section[data-testid="stSidebar"] .oq-sbrole span { display:block; font-family:'Inter',sans-serif; font-size:12px; color:var(--muted); margin-top:2px; }
+/* sidebar expand arrow: always visible when collapsed */
+[data-testid="stToolbar"] { background:transparent !important; }
+[data-testid="stExpandSidebarButton"], [data-testid="stSidebarCollapsedControl"] { display:flex !important; visibility:visible !important; opacity:1 !important; z-index:1000 !important; }
+/* floating Ask 1Q button: shown when the sidebar is closed */
+.st-key-fab { position:fixed !important; right:24px; bottom:24px; z-index:999; width:auto !important; }
+.st-key-fab button *, .st-key-fab button p { color:var(--on-primary) !important; }
+.st-key-fab button { border-radius:999px !important; background:var(--primary) !important; color:var(--on-primary) !important; border:none !important;
+  box-shadow:0 6px 24px rgba(0,0,0,.25) !important; padding:10px 18px !important; font-weight:600 !important; }
+body:has(section[data-testid="stSidebar"][data-collapsed="false"]) .st-key-fab { display:none !important; }
+[data-testid="stPopoverBody"] { background:var(--surface) !important; color:var(--ink) !important; border:1px solid var(--line2) !important; border-radius:16px !important; }
+[data-testid="stPopoverBody"] .oq-chat-head { border-top:none; padding-top:0; margin-top:0; }
+[data-testid="stPopoverBody"] input { background:var(--bg) !important; color:var(--ink) !important; border-radius:999px !important; }
+[data-testid="stPopoverBody"] [data-testid="stFormSubmitButton"] button { border-radius:999px !important; background:var(--primary) !important; color:var(--on-primary) !important; border:none !important; }
+[data-testid="stPopoverBody"]:has(.st-key-fab_chat_box) { width:min(380px, 92vw) !important; }
+.st-key-fab_chat_box { height:clamp(160px, 45vh, 340px) !important; overflow-y:auto !important; background:var(--surface2); border:1px solid var(--line); border-radius:16px; padding:10px; }
+/* sidebar chat always fits: thread shrinks on short screens, input row stays visible */
+.st-key-chat_box { height:clamp(96px, calc(100vh - 610px), 300px) !important; overflow-y:auto !important; }
+.st-key-chat_box > div { height:auto !important; }
+[data-testid="stSidebar"] [data-testid="stForm"] { padding:0 !important; margin-bottom:8px; }
+[data-testid="stSidebar"] [data-testid="stFormSubmitButton"] button * { color:var(--on-primary) !important; }
+@media (max-height:820px) { section[data-testid="stSidebar"] .oq-stats .oq-stat { padding:8px 12px !important; } section[data-testid="stSidebar"] .oq-chat-head { margin:10px 0 6px !important; padding-top:10px !important; } }
+/* layout d on phones: compact mascot strip above the question */
+@media (max-width:640px) {
+  .st-key-ml_d [data-testid="stHorizontalBlock"]:has(.st-key-quiz_stage) { flex-direction:column-reverse !important; gap:6px !important; }
+  .st-key-ml_d .st-key-quiz_stage .oq-qstage { display:flex !important; flex-direction:row !important; align-items:center; gap:8px; }
+  .st-key-ml_d .st-key-quiz_stage .fig svg { width:48px !important; height:auto; }
+  .st-key-ml_d .st-key-quiz_stage .oq-sbubble { margin:0 !important; font-size:13px; padding:6px 10px !important; }
+  .st-key-ml_d .st-key-quiz_stage [data-testid="stButton"], .st-key-ml_d .oq-tease { display:none !important; }
+  .stApp .st-key-quiz_col .oq-card h3 { font-size:16px !important; line-height:1.35 !important; }
+  .st-key-quiz_col .oq-card .oq-tag:not(.tone) { display:none; }
+  .st-key-quiz_col .oq-ring svg { width:30px; height:30px; } .st-key-quiz_col .oq-ring .t br, .st-key-quiz_col .oq-ring .t b ~ * { display:none; }
+  .oq-slim { padding-top:36px !important; margin-bottom:0 !important; }
+  [data-testid="stMain"] [data-testid="stVerticalBlock"] { gap:6px !important; }
+  [data-testid="stMain"] [data-testid="stTabs"] [role="tablist"] { margin-bottom:4px !important; }
+  [data-testid="stMain"] [data-testid="stTabs"] [role="tabpanel"] { padding-top:4px !important; }
+  .st-key-quiz_col .oq-card { padding:10px 12px 10px !important; }
+  .st-key-quiz_col .oq-qtop { margin-bottom:2px !important; } .oq-slim span { display:none !important; }
+  .st-key-fab { top:10px; right:10px; bottom:auto; }
+  .st-key-fab button { padding:6px 12px !important; font-size:13px !important; }
+}
+/* progress dashboard: even card grid */
+.st-key-prog [data-testid="stVerticalBlockBorderWrapper"]:has(.oq-pcard) { height:100%; }
+.st-key-prog [class*="st-key-pc_"] { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px 12px; box-shadow:var(--shadow); height:100%; }
+.st-key-prog [data-testid="stHorizontalBlock"] { gap:20px !important; margin-bottom:20px; align-items:stretch; }
+.st-key-prog .oq-radar svg { max-height:380px; }
+.st-key-prog [class*="st-key-pc_"] [data-testid="stVegaLiteChart"], .st-key-prog [class*="st-key-pc_"] .oq-radar,
+.st-key-prog [class*="st-key-pc_"] .oq-chart, .st-key-prog [class*="st-key-pc_"] .oq-heat { background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important; }
+.st-key-prog [class*="st-key-pc_"] > div:first-child, .st-key-prog [class*="st-key-pc_"] .oq-h { margin:0 0 8px !important; padding-top:0 !important; }
+.st-key-prog [class*="st-key-pc_"] .oq-h h3 { margin:0 !important; padding:0 !important; }
+.st-key-prog [class*="st-key-pc_"] [data-testid="stVerticalBlock"] { gap:8px !important; }
 </style>
 """
 
@@ -708,6 +761,11 @@ LIVE_JS = """
 <script>
 (function(){
   const W = window, D = document;
+  // keep chat threads scrolled to the newest message
+  if (!W.__oqChatScroll) { W.__oqChatScroll = setInterval(function(){
+    D.querySelectorAll('.st-key-chat_box, .st-key-fab_chat_box').forEach(function(b){
+      [b, b.firstElementChild].forEach(function(e){ if (!e) return; const n = e.scrollHeight; if (e.__n !== n) { e.__n = n; e.scrollTop = n; } }); });
+  }, 400); }
   if (W.__oneqLive) return; W.__oneqLive = true;
   const reduce = W.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let px = W.innerWidth/2, py = W.innerHeight/3, lastMove = Date.now();
@@ -965,7 +1023,7 @@ def progress_ring(done: int, total: int) -> str:
             f'<circle cx="24" cy="24" r="{r}" stroke="var(--line2)" stroke-width="3" fill="none"/>'
             f'<circle class="fg" cx="24" cy="24" r="{r}" stroke="var(--primary)" stroke-width="3" fill="none" stroke-linecap="round" '
             f'stroke-dasharray="{c:.1f}" stroke-dashoffset="{off:.1f}" transform="rotate(-90 24 24)"/></svg>'
-            f'<div class="t"><b>{done} of {total}</b><br>Answers lock when you check them.</div></div>')
+            f'<div class="t"><b>Question {min(done + 1, total)} of {total}</b><small><br>Answers lock when you check them.</small></div></div>')
 
 
 def podium(rows: list[dict], period: str = "overall", theme: str = DEFAULT_THEME) -> str:

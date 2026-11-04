@@ -351,3 +351,22 @@ def test_greeting_uses_local_hour():
     assert avatar.greeting("A", datetime(2026, 11, 4, 9)).startswith("Good morning")
     assert avatar.greeting("A", datetime(2026, 11, 4, 14)).startswith("Good afternoon")
     assert avatar.greeting("A", datetime(2026, 11, 4, 19)).startswith("Good evening")
+
+
+def test_chat_fallback_and_safe_science():
+    from oneq import chat, avatar
+    class Boom(llm.Provider):
+        def available(self): return True
+        def chat(self, *a, **k): raise RuntimeError("down")
+    llm.set_provider(Boom())
+    try:
+        assert chat.reply([], "what is p53?", "A", None, None) in chat.OFFLINE
+    finally:
+        llm.set_provider(None)
+    assert avatar.is_safe_chat("CAR-T cells kill tumour cells in patients")
+
+
+def test_banks_wide_enough():
+    from oneq import avatar
+    assert all(len(v) >= 4 for v in avatar.TOPIC_QUIPS.values())
+    assert len(avatar.ASK_LINES) >= 20 and len(avatar.HINTS) >= 12

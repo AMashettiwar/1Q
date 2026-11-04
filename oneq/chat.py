@@ -17,6 +17,8 @@ REFUSALS = [
     "Ooh, sneaky. I only talk about the current question after you answer it.",
 ]
 OFFLINE = [
+    "My thinking cloud is on a coffee break, so I am running on pocket knowledge. Ask me again in a minute?",
+    "Signal is weak in here, like a faint band on a western blot. Try me again shortly.",
     "My big brain is napping right now, so chat is limited. Try the quiz and I will cheer you on!",
     "I can't reach my thinking cloud at the moment. Ask me again a bit later?",
     "Chat is offline for a moment. Here is a fun fact instead: elephants carry about 20 copies of TP53.",
@@ -81,7 +83,7 @@ def reply(history: list[dict], msg: str, name: str, role: str | None, active_q: 
                      f"Conversation so far:\n{convo}\nuser: {msg}\nReply as 1Q.").strip()
     except Exception:
         return random.choice(OFFLINE)
-    if not out or not avatar.is_safe(out):
+    if not out or not avatar.is_safe_chat(out):
         return "Let me keep things light and kind. Ask me anything about cancer biology and I will dig in!"
     if active_q and leaks(out, active_q):
         return random.choice(REFUSALS)

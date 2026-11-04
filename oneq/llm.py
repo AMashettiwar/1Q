@@ -54,12 +54,15 @@ class Provider:
         raise NotImplementedError
 
 
+FALLBACK_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"]
+
+
 class GroqProvider(Provider):
     name = "groq"
 
     def __init__(self):
         self.key = config.get("GROQ_API_KEY")
-        self.model = config.get("LLM_MODEL", "llama-3.3-70b-versatile")
+        self.model = config.get("LLM_MODEL", "openai/gpt-oss-120b")
 
     def available(self):
         return bool(self.key)
@@ -68,10 +71,19 @@ class GroqProvider(Provider):
         from groq import Groq
         client = Groq(api_key=self.key, timeout=30)
         kw = {"response_format": {"type": "json_object"}} if json_mode else {}
-        r = client.chat.completions.create(
-            model=self.model, temperature=0.7,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}], **kw)
-        return r.choices[0].message.content or ""
+        err = None
+        for m in dict.fromkeys([self.model, *FALLBACK_MODELS]):  # retired models fall through to the next one
+            try:
+                r = client.chat.completions.create(
+                    model=m, temperature=0.7,
+                    messages=[{"role": "system", "content": system}, {"role": "user", "content": user}], **kw)
+                self.model = m
+                return r.choices[0].message.content or ""
+            except Exception as e:  # noqa: BLE001
+                err = e
+                if "model" not in str(e).lower():
+                    raise
+        raise err
 
 
 class OpenAICompatProvider(Provider):
@@ -89,10 +101,19 @@ class OpenAICompatProvider(Provider):
         from openai import OpenAI  # optional dependency
         client = OpenAI(api_key=self.key, base_url=self.base)
         kw = {"response_format": {"type": "json_object"}} if json_mode else {}
-        r = client.chat.completions.create(
-            model=self.model, temperature=0.7,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}], **kw)
-        return r.choices[0].message.content or ""
+        err = None
+        for m in dict.fromkeys([self.model, *FALLBACK_MODELS]):  # retired models fall through to the next one
+            try:
+                r = client.chat.completions.create(
+                    model=m, temperature=0.7,
+                    messages=[{"role": "system", "content": system}, {"role": "user", "content": user}], **kw)
+                self.model = m
+                return r.choices[0].message.content or ""
+            except Exception as e:  # noqa: BLE001
+                err = e
+                if "model" not in str(e).lower():
+                    raise
+        raise err
 
 
 class NoneProvider(Provider):

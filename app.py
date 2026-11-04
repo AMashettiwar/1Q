@@ -317,7 +317,7 @@ def quiz_tab(s, u: User, ds: DailySet):
 
     bar = "".join(f'<i class="{"on" if i < len(done) else "now" if i == len(done) and not fb else ""}"></i>' for i in range(total))
     lay = mascot_layout()
-    top = (f'<div class="oq-qtop"><div class="oq-qhead">{ui.progress_ring(len(done), total)}</div>'
+    top = (f'<div class="oq-qtop"><div class="oq-qhead">{ui.progress_ring(len(done) if fb is None else len(done) - 1, total)}</div>'
            f'<div class="oq-qbar" aria-hidden="true">{bar}</div></div>')
     with st.container(key="quiz_col"), st.container(key=f"ml_{lay}"):
         if lay == "a":  # slim banner row above the question
@@ -351,10 +351,24 @@ def quiz_tab(s, u: User, ds: DailySet):
 
 
 def mascot_layout() -> str:
-    """Temporary switch for trying mascot placements: ?ml=a|b|c|d or MASCOT_LAYOUT; default is the current one."""
+    """Mascot placement. Default "d" (sidekick column); ?ml=a|b|c|cur or MASCOT_LAYOUT to try others."""
     from oneq import config
     v = str(st.query_params.get("ml") or config.get("MASCOT_LAYOUT", "") or "").lower()
-    return v if v in ("a", "b", "c", "d") else "cur"
+    return v if v in ("a", "b", "c", "cur") else "d"
+
+
+def fresh(make, rng=None, tries=12) -> str:
+    """Pick a line not used recently this session (shared bank for every mascot, no back-to-back repeats)."""
+    rng = rng or random.Random()
+    seen = SS.setdefault("recent_lines", [])
+    line = make(rng)
+    for _ in range(tries):
+        if line not in seen:
+            break
+        line = make(rng)
+    seen.append(line)
+    del seen[:-40]
+    return line
 
 
 def quiz_stage(u: User, qs, done, fb, idx):
@@ -370,7 +384,10 @@ def quiz_stage(u: User, qs, done, fb, idx):
             msg, expr = SS["avatar_msg"], SS.get("avatar_expr") or "happy"
         else:
             rng = random.Random(f"{u.id}{q['id'] if q else ''}{today()}")
-            msg, expr = avatar.ask_line(u.role, q.get("subtopic") if q else None, rng), "thinking"
+            key = f"ask_{q['id'] if q else ''}"
+            if key not in SS:
+                SS[key] = fresh(lambda r: avatar.ask_line(u.role, q.get("subtopic") if q else None, r), rng)
+            msg, expr = SS[key], "thinking"
         SS.pop("avatar_fresh", None)
         if SS.get("stage_tickle"):
             msg, expr = SS.pop("stage_tickle")
@@ -419,13 +436,13 @@ def _quiz_body(s, u: User, qs, done, total, fb, idx):
     chips = ui.topic_tag(q["subtopic"], SUBTOPICS.get(q["subtopic"], q["subtopic"]), theme()) + ui.chip(adaptive.LEVEL_NAMES.get(q.get("level", 2), ""))
     chips += {"review": ui.chip("Rematch", "review"), "boss": ui.chip("Boss round", "boss"),
               "wildcard": ui.chip("Wild card", "boss")}.get(q.get("kind"), "")
-    st.markdown(f'<div class="oq-card">{chips}<div class="oq-eyebrow">Question {idx + 1} of {total}</div>'
+    st.markdown(f'<div class="oq-card">{chips}'
                 f'<h3>{ui.esc(q["question"])}</h3></div>', unsafe_allow_html=True)
     choice = st.radio("Pick one", list(range(4)), format_func=lambda i: q["options"][i], index=None,
                       key=f"ans_{q['id']}", label_visibility="collapsed")
     c1, c2 = st.container(key="lockrow").columns([3, 1])
     if c2.button("Hint", key=f"hint_{q['id']}", width="stretch"):
-        SS.setdefault("hints", {})[q["id"]] = random.choice(avatar.HINTS)
+        SS.setdefault("hints", {})[q["id"]] = fresh(lambda r: r.choice(avatar.HINTS))
     if SS.get("hints", {}).get(q["id"]):
         st.markdown(ui.note("1Q: " + SS["hints"][q["id"]], "spark"), unsafe_allow_html=True)
     st.markdown('<div class="oq-kbd"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> or <kbd>A</kbd>–<kbd>D</kbd> to choose,'
@@ -449,9 +466,9 @@ def _quiz_body(s, u: User, qs, done, total, fb, idx):
             u.soft_flags += 1
         rng = random.Random()
         if ok:
-            line = avatar.react_line(u.role, "right", u.mascot, rng)
+            line = fresh(lambda r: avatar.react_line(u.role, "right", u.mascot, r), rng)
         else:
-            line = avatar.react_line(u.role, "wrong", u.mascot, rng)
+            line = fresh(lambda r: avatar.react_line(u.role, "wrong", u.mascot, r), rng)
         SS["feedback"] = {"q": q, "correct": ok, "line": line, "pick": choice, "n": idx + 1}
         if nudge:
             say(nudge, "suspicious")
@@ -504,9 +521,9 @@ def results(s, u: User, ds: DailySet, qs):
         right = q["options"][q["answer_index"]]
         mine = picks.get(q["id"])
         if ok:
-            line = avatar.react_line(u.role, "right", u.mascot, rng)
+            line = fresh(lambda r: avatar.react_line(u.role, "right", u.mascot, r), rng)
         else:
-            line = avatar.react_line(u.role, "wrong", u.mascot, rng)
+            line = fresh(lambda r: avatar.react_line(u.role, "wrong", u.mascot, r), rng)
         st.markdown(ui.review_card(i + 1, q, ok, mine, line), unsafe_allow_html=True)
     col_rev.__exit__(None, None, None)
     with col_share, st.container(key="share_rail"):
@@ -568,6 +585,12 @@ def _mastery_chart(topics):
     return _style(bars.properties(height=max(120, 28 * len(df))))
 
 
+def _radar_topics(p, n=8):
+    """Radar stays readable: the n most-practised topics."""
+    seen = {c["key"]: c["answered"] for c in p["coverage"]}
+    return sorted(p["topics"], key=lambda t: -seen.get(t["key"], 0))[:n]
+
+
 def progress_tab(s, u: User):
     st.markdown(ui.section("progress", "03 / My progress", theme()), unsafe_allow_html=True)
     p = qe.progress(s, u)
@@ -577,60 +600,68 @@ def progress_tab(s, u: User):
     th = theme()
     if not p["topics"]:
         st.markdown(ui.empty("Your topic map fills in after your first set. Twelve questions and it starts drawing itself.", "level"), unsafe_allow_html=True)
-    else:
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown(ui.heading("Mastery radar", "Where you are strong"), unsafe_allow_html=True)
-            st.markdown(ui.radar(p["topics"], th) or ui.empty("Three topics in and the radar draws itself.", "level"), unsafe_allow_html=True)
-        with c2:
-            st.markdown(ui.heading("Topic coverage", "Share of your questions"), unsafe_allow_html=True)
-            cov = pd.DataFrame(p["coverage"])
-            if len(cov):
-                cov = cov.sort_values("answered", ascending=False).reset_index(drop=True)
-                if len(cov) > 7:
-                    rest = cov.iloc[6:]
-                    cov = pd.concat([cov.iloc[:6], pd.DataFrame([{"topic": "Other", "key": "_other",
-                                    "answered": int(rest["answered"].sum())}])], ignore_index=True)
-                t_muted = ui.THEMES[th]["muted"]
-                cov["color"] = [t_muted if k == "_other" else ui.tone(ui.TOPIC_TONES.get(k, "teal"), th) for k in cov["key"]]
-                donut = alt.Chart(cov).mark_arc(innerRadius=62, outerRadius=110, cornerRadius=3, padAngle=.015).encode(
-                    theta=alt.Theta("answered:Q"), color=alt.Color("color:N", scale=None),
-                    order=alt.Order("answered:Q", sort="descending"), tooltip=["topic", "answered"])
-                st.altair_chart(_style(donut.properties(height=260)), width="stretch")
-                st.markdown(ui.legend(cov.to_dict("records")), unsafe_allow_html=True)
-    m1, m2 = st.columns(2, gap="large")
-    if p["topics"]:
-        with m1:
-            st.markdown(ui.heading("Topic mastery", "Level 0 to 5 per topic"), unsafe_allow_html=True)
-            st.altair_chart(_mastery_chart(p["topics"]), width="stretch")
     act = pd.DataFrame(p["activity"])
-    if act["points"].sum() > 0:
-        with m2:
-            st.markdown(ui.heading("Activity calendar", "Points per day"), unsafe_allow_html=True)
-            st.markdown(ui.heatmap(p["activity"], today()), unsafe_allow_html=True)
-    c3, c4 = st.columns([3, 2], gap="large")
-    lv = pd.DataFrame(p["level_series"])
-    if len(lv) >= 2:
-        with c3:
-            st.markdown(ui.heading("Knowledge level", "Overall, over time"), unsafe_allow_html=True)
-            lv["day"] = pd.to_datetime(lv["day"])
-            base = alt.Chart(lv).encode(x=alt.X("day:T", title=None, axis=alt.Axis(format="%b %d")),
-                                        y=alt.Y("level:Q", title="Level", scale=alt.Scale(zero=False)))
-            area = base.mark_area(interpolate="monotone", color=ui.tone("teal", th), opacity=.16)
-            line = base.mark_line(interpolate="monotone", color=ui.tone("teal", th), strokeWidth=2.5)
-            st.altair_chart(_style((area + line + base.mark_circle(size=40, color=ui.tone("navy", th))).properties(height=200)),
-                            width="stretch")
-    rk = pd.DataFrame(p["rank_series"])
-    if len(rk) >= 2:
-        with c4:
-            st.markdown(ui.heading("Rank over time", "Lower is higher"), unsafe_allow_html=True)
-            rk["day"] = pd.to_datetime(rk["day"])
-            spark = alt.Chart(rk).mark_line(interpolate="monotone", color=ui.tone("brass", th), strokeWidth=2.5,
-                                             point=alt.OverlayMarkDef(color=ui.tone("brass", th), size=36)).encode(
-                x=alt.X("day:T", title=None, axis=alt.Axis(format="%b %d", tickCount=4)),
-                y=alt.Y("rank:Q", title="Rank", scale=alt.Scale(reverse=True, zero=False), axis=alt.Axis(tickMinStep=1)))
-            st.altair_chart(_style(spark.properties(height=200)), width="stretch")
-            st.caption(f"Now #{int(rk['rank'].iloc[-1])}. Lower is higher on the board.")
+    lv, rk = pd.DataFrame(p["level_series"]), pd.DataFrame(p["rank_series"])
+
+    def card(key, title, sub):
+        c = st.container(key=f"pc_{key}")
+        c.markdown(ui.heading(title, sub), unsafe_allow_html=True)
+        return c
+
+    def donut_chart(c):
+        cov = pd.DataFrame(p["coverage"])
+        if not len(cov):
+            return c.markdown(ui.empty("Coverage appears after a few answers.", "level"), unsafe_allow_html=True)
+        cov = cov.sort_values("answered", ascending=False).reset_index(drop=True)
+        if len(cov) > 7:
+            rest = cov.iloc[6:]
+            cov = pd.concat([cov.iloc[:6], pd.DataFrame([{"topic": "Other", "key": "_other",
+                            "answered": int(rest["answered"].sum())}])], ignore_index=True)
+        cov["color"] = [ui.THEMES[th]["muted"] if k == "_other" else ui.tone(ui.TOPIC_TONES.get(k, "teal"), th) for k in cov["key"]]
+        donut = alt.Chart(cov).mark_arc(innerRadius=70, outerRadius=118, cornerRadius=3, padAngle=.015).encode(
+            theta=alt.Theta("answered:Q"), color=alt.Color("color:N", scale=None),
+            order=alt.Order("answered:Q", sort="descending"), tooltip=["topic", "answered"])
+        c.altair_chart(_style(donut.properties(height=250)), width="stretch")
+        c.markdown(ui.legend(cov.to_dict("records")), unsafe_allow_html=True)
+
+    with st.container(key="prog"):
+        if p["topics"]:
+            r1, r2 = st.columns(2, gap="medium")
+            with r1:
+                card("radar", "Mastery radar", "Where you are strong").markdown(
+                    ui.radar(_radar_topics(p), th) or ui.empty("Three topics in and the radar draws itself.", "level"), unsafe_allow_html=True)
+            with r2:
+                donut_chart(card("cov", "Topic coverage", "Share of your questions"))
+            r3, r4 = st.columns(2, gap="medium")
+            with r3:
+                card("mast", "Topic mastery", "Level 0 to 5 per topic").altair_chart(_mastery_chart(p["topics"]), width="stretch")
+            with r4:
+                c = card("cal", "Activity calendar", "Points per day")
+                if act["points"].sum() > 0:
+                    c.markdown(ui.heatmap(p["activity"], today()), unsafe_allow_html=True)
+                else:
+                    c.markdown(ui.empty("Your first set lights up today's square.", "flame"), unsafe_allow_html=True)
+        if len(lv) >= 2 or len(rk) >= 2:
+            r5, r6 = st.columns(2, gap="medium")
+            if len(lv) >= 2:
+                with r5:
+                    c = card("lvl", "Knowledge level", "Overall, over time")
+                    lv["day"] = pd.to_datetime(lv["day"])
+                    base = alt.Chart(lv).encode(x=alt.X("day:T", title=None, axis=alt.Axis(format="%b %d", tickCount=5)),
+                                                y=alt.Y("level:Q", title="Level", scale=alt.Scale(zero=False)))
+                    area = base.mark_area(interpolate="monotone", color=ui.tone("teal", th), opacity=.16)
+                    line = base.mark_line(interpolate="monotone", color=ui.tone("teal", th), strokeWidth=2.5)
+                    c.altair_chart(_style((area + line + base.mark_circle(size=40, color=ui.tone("navy", th))).properties(height=230)),
+                                   width="stretch")
+            if len(rk) >= 2:
+                with r6:
+                    c = card("rank", "Rank over time", f"Now #{int(rk['rank'].iloc[-1])}. Lower is higher")
+                    rk["day"] = pd.to_datetime(rk["day"])
+                    spark = alt.Chart(rk).mark_line(interpolate="monotone", color=ui.tone("brass", th), strokeWidth=2.5,
+                                                     point=alt.OverlayMarkDef(color=ui.tone("brass", th), size=36)).encode(
+                        x=alt.X("day:T", title=None, axis=alt.Axis(format="%b %d", tickCount=5)),
+                        y=alt.Y("rank:Q", title="Rank", scale=alt.Scale(reverse=True, zero=False), axis=alt.Axis(tickMinStep=1)))
+                    c.altair_chart(_style(spark.properties(height=230)), width="stretch")
     st.markdown(ui.heading("Badges", "Earned, never bought"), unsafe_allow_html=True)
     owned = qe.unlocked(u)
     badges = [b for b in owned if b not in avatar.ACCESSORIES] + [avatar.ACCESSORY_NAMES.get(k, k) for k in owned if k in avatar.ACCESSORIES and k]
@@ -708,17 +739,17 @@ def admin_tab(s):
 
 
 # ---------------------------------------------------------------- chat
-def chat_panel(s, u: User, ds: DailySet):
+def chat_panel(s, u: User, ds: DailySet, prefix: str = ""):
     st.markdown(f'<div class="oq-chat-head">{mascot("happy", "", 100, 34)}<div><b>Ask 1Q</b><span>Cancer biology, any depth</span></div>'
                 f'<i class="live" title="online"></i></div>', unsafe_allow_html=True)
     hist = SS.setdefault("chat", [{"role": "assistant", "content": f"Hi {u.display_name}! Ask me anything about cancer biology. "
                                    "I will not spoil a live quiz question though."}])
-    box = st.container(height=320, key="chat_box", border=False)
+    box = st.container(height=320, key=f"{prefix}chat_box", border=False)
     box.markdown(ui.chat_thread(hist[-12:], u.display_name), unsafe_allow_html=True)
-    with st.form("chat_form", clear_on_submit=True, border=False):
+    with st.form(f"{prefix}chat_form", clear_on_submit=True, border=False):
         msg = st.text_input("Message 1Q", placeholder=f"e.g. explain CAR-T {persona.CHAT_HINT.get(persona.bucket(persona.profile(u.role)), 'simply')}",
-                            label_visibility="collapsed", key="chat_msg")
-        sent = st.form_submit_button("Send", width="stretch", key="chat_send", icon=":material/arrow_upward:")
+                            label_visibility="collapsed", key=f"{prefix}chat_msg")
+        sent = st.form_submit_button("Send", width="stretch", key=f"{prefix}chat_send", icon=":material/arrow_upward:")
     if sent and msg.strip():
         if SS.get("feedback"):
             active = None  # just answered: free to discuss
@@ -728,7 +759,8 @@ def chat_panel(s, u: User, ds: DailySet):
         if not chat.RateLimiter(SS).allow():
             ans = chat.SLOW_DOWN
         else:
-            ans = chat.reply(hist[:-1], msg, u.display_name, u.role, active)
+            with st.spinner("1Q is thinking..."):
+                ans = chat.reply(hist[:-1], msg, u.display_name, u.role, active)
         hist.append({"role": "assistant", "content": ans})
         st.rerun()
 
@@ -790,15 +822,12 @@ def main():
         mood = avatar.mood(u.streak, SS["days_away"], now, ds.completed)
 
         with st.sidebar:
-            st.markdown(f"### {u.display_name}")
-            st.caption(f"{u.role} · {u.title}")
+            st.markdown(f'<div class="oq-sbrole">{ui.esc(u.role or "")}<span>{ui.esc(u.title or "")}</span></div>', unsafe_allow_html=True)
             st.markdown(ui.stats([("flame", "Streak", u.streak, "days"),
                                   ("level", "Level", adaptive.LEVEL_NAMES[qe.overall_level(s, u)], ""),
                                   ("shield", "Shields", u.shields, "")]), unsafe_allow_html=True)
-            n_q = len(json.loads(ds.questions_json))
-            n_ans = len(qe.answered_today(s, u, today()))
-            st.progress(1.0 if ds.completed else n_ans / n_q,
-                        text="Today's set: done" if ds.completed else f"Today: {n_ans} of {n_q}")
+            if ds.completed:
+                st.progress(1.0, text="Today's set: done")
             chat_panel(s, u, ds)
             dark = st.toggle("Dark theme", value=theme() == "ink", key="theme_toggle")
             if (dark and theme() != "ink") or (not dark and theme() != "ivory"):
@@ -821,6 +850,9 @@ def main():
             st.markdown(f'<div class="oq-slim"><div class="g">{ui.esc(avatar.greeting(u.display_name, now_local()))}</div>'
                         f'<span>{ui.icon("spark", 13)}{ui.esc(avatar.daily_pick(avatar.SAYS, today()))}</span></div>',
                         unsafe_allow_html=True)
+        with st.container(key="fab"):
+            with st.popover("Ask 1Q", icon=":material/chat_bubble:"):
+                chat_panel(s, u, ds, prefix="fab_")
         with st.container(key="oneq_hidden"):
             st.text_input("signals", key="oneq_signals", label_visibility="collapsed")
         st.html(ui.SIGNALS_JS + ui.LIVE_JS, unsafe_allow_javascript=True)

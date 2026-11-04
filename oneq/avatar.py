@@ -488,6 +488,15 @@ _BANNED = ["patient", "death", "dead", "die ", "dying", "suffer", "pain", "grief
            "sarcas", "ugly", "fat ", "shame"]
 
 
+_CHAT_BANNED = ["politic", "election", "religio", "church", "pray", "stupid", "dumb", "idiot", "loser", "ugly", "shame"]
+
+
+def is_safe_chat(text: str) -> bool:
+    """Chat answers may discuss science plainly (patients, cell death); only block the off-limits topics and insults."""
+    t = f" {text.lower()} "
+    return not any(b in t for b in _CHAT_BANNED)
+
+
 def is_safe(line: str) -> bool:
     t = f" {line.lower()} "
     return not any(b in t for b in _BANNED)
@@ -677,3 +686,46 @@ WRONG += [
     "Tricky one. Even the textbooks had a draft two of this.",
 ]
 _filter_banks()
+
+
+# ---- wider shared banks (same for every mascot) so lines rarely repeat
+_MORE_QUIPS = {
+    "hallmarks": ["Ten hallmarks, one question. Pick your favourite child.", "Hanahan and Weinberg would want you to read every option."],
+    "oncogenes": ["Gas pedal or brake? Classic oncogene energy.", "One mutation to rule them all? Let us see."],
+    "dna_repair": ["Repair crews on standby. Read carefully, fix later.", "Mismatch spotted? So far, just in the options."],
+    "immunotherapy": ["T cells are watching. No pressure.", "Checkpoint ahead. Show your badge, I mean your answer."],
+    "genomics": ["Reading the genome one option at a time.", "Variant calling, but make it multiple choice."],
+    "single_cell": ["Every cell has a story. This one has four endings.", "Cluster your thoughts, then pick."],
+    "spatial": ["Location, location, location. Even for cells.", "Where it sits matters. So does what you pick."],
+    "drug_dev": ["From bench to bedside in one click.", "Phase one: read. Phase two: decide."],
+    "trials": ["Randomise your doubts, not your answer.", "Primary endpoint: you, getting this right."],
+    "biomarkers": ["A good biomarker is specific. So is a good guess.", "Sensitivity check: how sure are you?"],
+    "tme": ["The neighbourhood matters. Even in tumours.", "Stroma, immune cells, vessels. Busy block."],
+    "epigenetics": ["Same DNA, different mood. Epigenetics, everyone.", "Methyl groups optional. Focus required."],
+    "metastasis": ["Cells on the move. Stay put and think.", "Seed and soil, but make it a quiz."],
+    "pathology": ["Zoom in. The answer is in the details.", "H and E stands for Highly Educated guess."],
+    "radiation": ["Fractionate your thinking. Small steps.", "Dose of facts incoming."],
+    "epidemiology": ["Correlation is not causation. Your answer is, though.", "Population-level thinking, single-click answer."],
+}
+for _k, _v in _MORE_QUIPS.items():
+    TOPIC_QUIPS.setdefault(_k, []).extend(_v)
+ASK_LINES += [
+    "Read twice, click once. My favourite protocol.", "I believe in you more than I believe in p-values.",
+    "Take a breath. The question is not going anywhere.", "This one is a good one. I picked it myself. Kind of.",
+    "Trust your first instinct, then check it.", "Fun fact: you are already better at this than yesterday.",
+    "Coffee optional. Curiosity required.", "Four options, one winner, zero judgement.",
+    "I am cheering quietly so you can think.", "Smart people pause here. You are smart.",
+]
+HINTS += [
+    "Rule out the option that sounds too absolute.", "Think about which one breaks the pattern.",
+    "Ask what the mechanism actually needs.", "Two options can sound alike. Spot the difference.",
+    "Picture the pathway step by step.", "The textbook answer is usually the simple one.",
+]
+CORRECT += [
+    "Clean result. Reviewer two has no notes.", "That answer just got published in my heart.",
+    "Right on. You make this look easy.", "Correct. I am doing a tiny happy dance.",
+]
+WRONG += [
+    "Close one. Now you will never forget it.", "Not this time, but the explanation is a good read.",
+    "Every expert got this wrong once. Welcome to the club.", "Plot twist. Let us see why.",
+]
