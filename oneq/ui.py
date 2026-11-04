@@ -690,10 +690,11 @@ body:has(section[data-testid="stSidebar"][data-collapsed="false"]) .st-key-fab {
 /* layout d on phones: compact mascot strip above the question */
 @media (max-width:640px) {
   .st-key-ml_d [data-testid="stHorizontalBlock"]:has(.st-key-quiz_stage) { flex-direction:column-reverse !important; gap:6px !important; }
-  .st-key-ml_d .st-key-quiz_stage .oq-qstage { display:flex !important; flex-direction:row !important; align-items:center; gap:8px; }
-  .st-key-ml_d .st-key-quiz_stage .fig svg { width:48px !important; height:auto; }
-  .st-key-ml_d .st-key-quiz_stage .oq-sbubble { margin:0 !important; font-size:13px; padding:6px 10px !important; }
-  .st-key-ml_d .st-key-quiz_stage [data-testid="stButton"], .st-key-ml_d .oq-tease { display:none !important; }
+  .st-key-ml_cur [data-testid="stHorizontalBlock"]:has(.st-key-quiz_stage) { gap:6px !important; }
+  .st-key-ml_cur .st-key-quiz_stage .oq-qstage, .st-key-ml_d .st-key-quiz_stage .oq-qstage { display:flex !important; flex-direction:row !important; align-items:center; gap:8px; }
+  .st-key-ml_cur .st-key-quiz_stage .fig svg, .st-key-ml_d .st-key-quiz_stage .fig svg { width:48px !important; height:auto; }
+  .st-key-ml_cur .st-key-quiz_stage .oq-sbubble, .st-key-ml_d .st-key-quiz_stage .oq-sbubble { margin:0 !important; font-size:13px; padding:6px 10px !important; }
+  .st-key-ml_cur .st-key-quiz_stage [data-testid="stButton"], .st-key-ml_cur .oq-tease, .st-key-ml_d .st-key-quiz_stage [data-testid="stButton"], .st-key-ml_d .oq-tease { display:none !important; }
   .stApp .st-key-quiz_col .oq-card h3 { font-size:16px !important; line-height:1.35 !important; }
   .st-key-quiz_col .oq-card .oq-tag:not(.tone) { display:none; }
   .st-key-quiz_col .oq-ring svg { width:30px; height:30px; } .st-key-quiz_col .oq-ring .t br, .st-key-quiz_col .oq-ring .t b ~ * { display:none; }
@@ -705,6 +706,13 @@ body:has(section[data-testid="stSidebar"][data-collapsed="false"]) .st-key-fab {
   .st-key-quiz_col .oq-qtop { margin-bottom:2px !important; } .oq-slim span { display:none !important; }
   .st-key-fab { top:10px; right:10px; bottom:auto; }
   .st-key-fab button { padding:6px 12px !important; font-size:13px !important; }
+}
+@media (min-width:641px) and (max-height:800px) {
+  .st-key-quiz_col .oq-card { padding:14px 18px !important; margin:8px 0 !important; }
+  .stApp .st-key-quiz_col .oq-card h3 { font-size:18px !important; }
+  .st-key-quiz_col div[role="radiogroup"] label { padding-top:7px !important; padding-bottom:7px !important; }
+  .oq-slim { margin-bottom:4px !important; } .st-key-quiz_col .oq-qtop { margin-bottom:0 !important; }
+  [data-testid="stMain"] [data-testid="stTabs"] [role="tabpanel"] { padding-top:6px !important; }
 }
 /* progress dashboard: even card grid */
 .st-key-prog [data-testid="stVerticalBlockBorderWrapper"]:has(.oq-pcard) { height:100%; }

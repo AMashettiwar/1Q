@@ -351,10 +351,10 @@ def quiz_tab(s, u: User, ds: DailySet):
 
 
 def mascot_layout() -> str:
-    """Mascot placement. Default "d" (sidekick column); ?ml=a|b|c|cur or MASCOT_LAYOUT to try others."""
+    """Mascot placement. Default "cur" (mascot column left of the question); ?ml=a|b|c|d or MASCOT_LAYOUT to try others."""
     from oneq import config
     v = str(st.query_params.get("ml") or config.get("MASCOT_LAYOUT", "") or "").lower()
-    return v if v in ("a", "b", "c", "cur") else "d"
+    return v if v in ("a", "b", "c", "d") else "cur"
 
 
 def fresh(make, rng=None, tries=12) -> str:
