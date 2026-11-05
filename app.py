@@ -719,9 +719,8 @@ def about_tab(s, u: User):
 and to how you are doing on each topic. About 70% is new material and 30% is a rematch of things you missed,
 reworded so you are learning the idea and not memorizing a sentence.</p>
 <p>Miss a question and it comes back tomorrow, then in 3 days, then in 7. Get it right each time and it retires.</p>
-<p>Streaks earn shields (one per 7 days) so a sick day does not wipe you out. Finish a set for mystery drops,
-outfits and titles. Fridays have a boss round.</p>
-<p>The leaderboard ranks by points, streak and mastery level. Nobody sees your right or wrong counts. Not even me. Okay, I see them, but I am a cartoon.</p>
+<p>Streaks earn shields (one per 7 days) so a sick day does not wipe you out. Fridays have a boss round.</p>
+<p>The leaderboard ranks by points, streak and mastery level. Nobody sees your right or wrong counts. Not even me. Okay, I see them, but I am a cartoon!!</p>
 </div>""", unsafe_allow_html=True)
     word = st.text_input("Whisper something to 1Q", key="whisper", placeholder="psst...")
     if word:
