@@ -582,7 +582,7 @@ def _mastery_chart(topics):
         x=alt.X("level:Q", title="Mastery level", scale=alt.Scale(domain=[0, 5]), axis=alt.Axis(values=[0, 1, 2, 3, 4, 5], format="d")),
         y=alt.Y("topic:N", title=None, sort="-x", axis=alt.Axis(labelLimit=220)),
         color=alt.Color("color:N", scale=None), tooltip=["topic", "level"])
-    return _style(bars.properties(height=max(120, 28 * len(df))))
+    return _style(bars.properties(height=max(200, 28 * len(df))))
 
 
 def _radar_topics(p, n=8):
@@ -631,13 +631,13 @@ def progress_tab(s, u: User):
                 card("radar", "Strengths", "Your 8 most-practised topics").markdown(
                     ui.radar(_radar_topics(p), th) or ui.empty("Three topics in and the radar draws itself.", "level"), unsafe_allow_html=True)
             with r2:
-                card("mast", "Mastery by topic", "Level 0 to 5, same topics").altair_chart(
-                    _mastery_chart(_radar_topics(p)), width="stretch")
-            c = card("cal", "Activity", "Points per day, last 18 weeks")
-            if act["points"].sum() > 0:
-                c.markdown(ui.heatmap(p["activity"], today()), unsafe_allow_html=True)
-            else:
-                c.markdown(ui.empty("Your first set lights up today's square.", "flame"), unsafe_allow_html=True)
+                c = card("cal", "Activity", "Points per day, last 18 weeks")
+                if act["points"].sum() > 0:
+                    c.markdown(ui.heatmap(p["activity"], today()), unsafe_allow_html=True)
+                else:
+                    c.markdown(ui.empty("Your first set lights up today's square.", "flame"), unsafe_allow_html=True)
+            card("mast", "Mastery by topic", "Level 0 to 5, same topics").altair_chart(
+                _mastery_chart(_radar_topics(p)), width="stretch")
         r5, r6 = st.columns(2, gap="medium")
         dayx = lambda: alt.X("day:T", title=None, axis=alt.Axis(format="%b %d", tickCount="day", labelOverlap=True))
         with r5:
