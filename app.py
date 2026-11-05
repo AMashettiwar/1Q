@@ -579,7 +579,7 @@ def _mastery_chart(topics):
     df = pd.DataFrame(topics)
     df["color"] = [ui.tone(ui.TOPIC_TONES.get(k, "teal"), theme()) for k in df["key"]]
     bars = alt.Chart(df).mark_bar(cornerRadiusEnd=3, height=14).encode(
-        x=alt.X("level:Q", title="Mastery level", scale=alt.Scale(domain=[0, 5])),
+        x=alt.X("level:Q", title="Mastery level", scale=alt.Scale(domain=[0, 5]), axis=alt.Axis(values=[0, 1, 2, 3, 4, 5], format="d")),
         y=alt.Y("topic:N", title=None, sort="-x", axis=alt.Axis(labelLimit=220)),
         color=alt.Color("color:N", scale=None), tooltip=["topic", "level"])
     return _style(bars.properties(height=max(120, 28 * len(df))))
@@ -638,27 +638,29 @@ def progress_tab(s, u: User):
                 c.markdown(ui.heatmap(p["activity"], today()), unsafe_allow_html=True)
             else:
                 c.markdown(ui.empty("Your first set lights up today's square.", "flame"), unsafe_allow_html=True)
-        if len(lv) >= 2 or len(rk) >= 2:
-            r5, r6 = st.columns(2, gap="medium")
-            if len(lv) >= 2:
-                with r5:
-                    c = card("lvl", "Knowledge level", "Overall, over time")
-                    lv["day"] = pd.to_datetime(lv["day"])
-                    base = alt.Chart(lv).encode(x=alt.X("day:T", title=None, axis=alt.Axis(format="%b %d", tickCount=5)),
-                                                y=alt.Y("level:Q", title="Level", scale=alt.Scale(zero=False)))
-                    area = base.mark_area(interpolate="monotone", color=ui.tone("teal", th), opacity=.16)
-                    line = base.mark_line(interpolate="monotone", color=ui.tone("teal", th), strokeWidth=2.5)
-                    c.altair_chart(_style((area + line + base.mark_circle(size=40, color=ui.tone("navy", th))).properties(height=230)),
-                                   width="stretch")
-            if len(rk) >= 2:
-                with r6:
-                    c = card("rank", "Rank over time", f"Now #{int(rk['rank'].iloc[-1])}. Lower is higher")
-                    rk["day"] = pd.to_datetime(rk["day"])
-                    spark = alt.Chart(rk).mark_line(interpolate="linear", color=ui.tone("brass", th), strokeWidth=2.5,
-                                                     point=alt.OverlayMarkDef(color=ui.tone("brass", th), size=36)).encode(
-                        x=alt.X("day:T", title=None, axis=alt.Axis(format="%b %d", tickCount=5)),
-                        y=alt.Y("rank:Q", title="Rank", scale=alt.Scale(reverse=True, zero=False), axis=alt.Axis(tickMinStep=1)))
-                    c.altair_chart(_style(spark.properties(height=230)), width="stretch")
+        r5, r6 = st.columns(2, gap="medium")
+        dayx = lambda: alt.X("day:T", title=None, axis=alt.Axis(format="%b %d", tickCount="day", labelOverlap=True))
+        with r5:
+            c = card("lvl", "Knowledge level", "Overall, over time")
+            if len(lv) >= 1:
+                lv["day"] = pd.to_datetime(lv["day"])
+                base = alt.Chart(lv).encode(x=dayx(), y=alt.Y("level:Q", title="Level", scale=alt.Scale(zero=False)))
+                area = base.mark_area(interpolate="monotone", color=ui.tone("teal", th), opacity=.16)
+                line = base.mark_line(interpolate="monotone", color=ui.tone("teal", th), strokeWidth=2.5)
+                c.altair_chart(_style((area + line + base.mark_circle(size=60, color=ui.tone("navy", th))).properties(height=230)),
+                               width="stretch")
+            else:
+                c.markdown(ui.empty("Your level line starts after your first set.", "level"), unsafe_allow_html=True)
+        with r6:
+            c = card("rank", "Rank over time", f"Now #{int(rk['rank'].iloc[-1])}. Lower is higher" if len(rk) else "Lower is higher")
+            if len(rk) >= 1:
+                rk["day"] = pd.to_datetime(rk["day"])
+                spark = alt.Chart(rk).mark_line(interpolate="linear", color=ui.tone("brass", th), strokeWidth=2.5,
+                                                 point=alt.OverlayMarkDef(color=ui.tone("brass", th), size=60)).encode(
+                    x=dayx(), y=alt.Y("rank:Q", title="Rank", scale=alt.Scale(reverse=True, zero=False), axis=alt.Axis(tickMinStep=1)))
+                c.altair_chart(_style(spark.properties(height=230)), width="stretch")
+            else:
+                c.markdown(ui.empty("Your rank line starts after your first set.", "trophy"), unsafe_allow_html=True)
     st.markdown(ui.heading("Badges", "Earned, never bought"), unsafe_allow_html=True)
     owned = qe.unlocked(u)
     badges = [b for b in owned if b not in avatar.ACCESSORIES] + [avatar.ACCESSORY_NAMES.get(k, k) for k in owned if k in avatar.ACCESSORIES and k]

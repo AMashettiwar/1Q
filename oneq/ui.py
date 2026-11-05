@@ -718,7 +718,7 @@ body:has(section[data-testid="stSidebar"][data-collapsed="false"]) .st-key-fab {
 .st-key-prog [data-testid="stVerticalBlockBorderWrapper"]:has(.oq-pcard) { height:100%; }
 .st-key-prog [class*="st-key-pc_"] { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px 12px; box-shadow:var(--shadow); height:100%; }
 .st-key-prog [data-testid="stHorizontalBlock"] { gap:20px !important; margin-bottom:20px; align-items:stretch; }
-.st-key-prog .oq-radar svg { max-height:300px; margin:0 auto; display:block; }
+.st-key-prog .oq-radar svg { max-width:100%; max-height:none; margin:0 auto; display:block; }
 .st-key-prog [class*="st-key-pc_"] { margin-bottom:20px; }
 .st-key-prog [data-testid="stHorizontalBlock"] [class*="st-key-pc_"] { margin-bottom:0; min-height:360px; }
 .st-key-prog [class*="st-key-pc_"] [data-testid="stVegaLiteChart"], .st-key-prog [class*="st-key-pc_"] .oq-radar,
@@ -1087,13 +1087,13 @@ def share_html(name: str, streak: int, rank: int, of: int, title: str, day, figu
             f'<div style="font-size:16px">{streak}-day streak · Rank {rank} of {of}</div></div>')
 
 
-def radar(topics: list[dict], theme: str = DEFAULT_THEME, size: int = 320) -> str:
+def radar(topics: list[dict], theme: str = DEFAULT_THEME, size: int = 380) -> str:
     """Animated spider chart of topic mastery (0-5). Inline SVG, themed, draws in on load."""
     import math
     if len(topics) < 3:
         return ""
     t = THEMES[theme]
-    n, c, R = len(topics), size / 2, size / 2 - 78
+    n, c, R = len(topics), size / 2, size / 2 - 40
     vmax = max(2.5, min(5.0, max(d["level"] for d in topics) * 1.2))  # zoom so early learners still see a shape
     pt = lambda i, v: (c + R * v / vmax * math.sin(2 * math.pi * i / n), c - R * v / vmax * math.cos(2 * math.pi * i / n))
     rings = "".join(f'<polygon points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, lv) for i in range(n)))}" '
@@ -1106,19 +1106,16 @@ def radar(topics: list[dict], theme: str = DEFAULT_THEME, size: int = 320) -> st
         x, y = pt(i, d["level"])
         col = tone(TOPIC_TONES.get(d.get("key", ""), "teal"), theme)
         dots += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{col}" class="oq-rdot" style="animation-delay:{.5 + i * .05:.2f}s"><title>{esc(d["topic"])}: {d["level"]}</title></circle>'
-        lx, ly = pt(i, vmax * 1.14)
+        lx, ly = pt(i, vmax * 1.12)
         anchor = "middle" if abs(lx - c) < 8 else ("start" if lx > c else "end")
-        words, l1, l2 = d["topic"].split(), "", ""
-        for wd in words:
-            if len(l1) + len(wd) < 15 and not l2:
-                l1 = (l1 + " " + wd).strip()
-            else:
-                l2 = (l2 + " " + wd).strip()
-        l2 = l2 if len(l2) <= 18 else l2[:17] + "…"
-        y0 = ly + (5 if not l2 else -3)
-        labels += (f'<text x="{lx:.1f}" y="{y0:.1f}" text-anchor="{anchor}" font-size="15" font-weight="600" fill="{t["ink"]}">{esc(l1)}'
-                   + (f'<tspan x="{lx:.1f}" dy="17">{esc(l2)}</tspan>' if l2 else "") + "</text>")
-    return (f'<div class="oq-chart oq-radar"><svg viewBox="-70 -14 {size + 140} {size + 28}" width="100%" role="img" '
+        import textwrap
+        ls = textwrap.wrap(d["topic"], 16)[:3]
+        if len(ls) == 3 and len(" ".join(textwrap.wrap(d["topic"], 16)[2:])) > 16:
+            ls[2] = ls[2][:15] + "…"
+        y0 = ly + 5 - 9.5 * (len(ls) - 1)
+        labels += (f'<text x="{lx:.1f}" y="{y0:.1f}" text-anchor="{anchor}" font-size="17" font-weight="600" fill="{t["ink"]}">{esc(ls[0])}'
+                   + "".join(f'<tspan x="{lx:.1f}" dy="19">{esc(l)}</tspan>' for l in ls[1:]) + "</text>")
+    return (f'<div class="oq-chart oq-radar"><svg viewBox="-95 -20 {size + 190} {size + 40}" width="100%" role="img" '
             f'aria-label="Topic mastery radar">{rings}{spokes}'
             f'<polygon class="oq-rshape" points="{shape}" fill="{teal}" fill-opacity=".18" stroke="{teal}" stroke-width="2" '
             f'stroke-linejoin="round"/>{dots}{labels}</svg></div>')
