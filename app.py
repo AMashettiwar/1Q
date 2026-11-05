@@ -82,6 +82,8 @@ def login_hero(known):
         now = datetime.now()
     role = (SS.get("login_role") or "").strip()
     line, expr = avatar.role_reaction(role) if role and not known else ("", "happy")
+    if role and not known and avatar.role_unmatched(role):
+        line = f"{role[:40]}, nice! " + line
     if not line:
         line = avatar.login_line(now, known) if known else f"{avatar.login_line(now)} Tell me who you are and I'll pitch today's twelve just right."
     if known:
@@ -435,7 +437,8 @@ def _quiz_body(s, u: User, qs, done, total, fb, idx):
     SS.setdefault("shown_at", {}).setdefault(q["id"], time.time())
     chips = ui.topic_tag(q["subtopic"], SUBTOPICS.get(q["subtopic"], q["subtopic"]), theme()) + ui.chip(adaptive.LEVEL_NAMES.get(q.get("level", 2), ""))
     chips += {"review": ui.chip("Rematch", "review"), "boss": ui.chip("Boss round", "boss"),
-              "wildcard": ui.chip("Wild card", "boss")}.get(q.get("kind"), "")
+              "wildcard": ui.chip("Wild card", "boss"),
+              "role": ui.chip("Your role · " + (q.get("concept_id", "").split("-")[1] if q.get("concept_id", "").startswith("role-") else "why"), "review")}.get(q.get("kind"), "")
     st.markdown(f'<div class="oq-card">{chips}'
                 f'<h3>{ui.esc(q["question"])}</h3></div>', unsafe_allow_html=True)
     choice = st.radio("Pick one", list(range(4)), format_func=lambda i: q["options"][i], index=None,
@@ -638,6 +641,14 @@ def progress_tab(s, u: User):
                     c.markdown(ui.empty("Your first set lights up today's square.", "flame"), unsafe_allow_html=True)
             card("mast", "Mastery by topic", "Level 0 to 5, same topics").altair_chart(
                 _mastery_chart(_radar_topics(p)), width="stretch")
+        if p.get("process"):
+            pdf = pd.DataFrame(p["process"])
+            pc = card("proc", "Process thinking", "Role questions: share right by why, when, where, how, what")
+            bars = alt.Chart(pdf).mark_bar(cornerRadiusEnd=3, height=14, color=ui.tone("teal", th)).encode(
+                x=alt.X("pct:Q", title="% right", scale=alt.Scale(domain=[0, 100])),
+                y=alt.Y("type:N", title=None, sort=["Why", "When", "Where", "How", "What"]),
+                tooltip=["type", "correct", "total"])
+            pc.altair_chart(_style(bars.properties(height=max(120, 34 * len(pdf)))), width="stretch")
         r5, r6 = st.columns(2, gap="medium")
         dayx = lambda: alt.X("day:T", title=None, axis=alt.Axis(format="%b %d", tickCount="day", labelOverlap=True))
         with r5:

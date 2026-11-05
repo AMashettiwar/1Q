@@ -26,6 +26,7 @@ class QuestionModel(BaseModel):
     options: list[str]
     answer_index: int
     explanation: str = Field(min_length=10)
+    qtype: str | None = None
 
     @field_validator("options")
     @classmethod
@@ -232,3 +233,46 @@ def guess_level(role_text: str) -> int | None:
         return int(m.group(0)) if m else None
     except Exception:
         return None
+
+
+QTYPES = ["why", "when", "where", "how", "what"]
+
+
+def generate_role_questions(role: str, fn: str, seniority: str, slots: list[tuple[str, int, str]],
+                            subtopic_keys: list[str], avoid: list[str]) -> list[dict] | None:
+    """Role-specific process-thinking questions. slots: [(subtopic, level, qtype)].
+    Each tests WHY/WHEN/WHERE/HOW/WHAT behind a step of the person's own job, tied to cancer biology."""
+    want = "\n".join(f"- subtopic={s}, level={lv}, qtype={t}" for s, lv, t in slots)
+    prompt = (f"The learner's job title is '{role[:80]}' (function {fn}, seniority {seniority}).\n"
+              f"Write {len(slots)} questions about the reasoning behind the real processes of THIS job "
+              f"(for a histology/IHC role: why stain, why antigen retrieval, why a negative control; for a data or software role: "
+              f"why hold out a test set, when a batch effect misleads, why keep an audit trail). Each question tests its qtype "
+              f"(why/when/where/how/what) and must connect to cancer biology or oncology work at 1cell.ai. "
+              f"Test the reasoning and what goes wrong if the step is skipped, not trivia. Wrong options must be plausible. "
+              f"In the explanation give the reason, the failure if skipped, and the cancer link. Use these slots, one question each:\n{want}\n"
+              f"subtopic must be exactly one of: {', '.join(subtopic_keys)}. Set qtype as given. "
+              f"concept_id is a short kebab-case slug. Avoid concepts already seen: {', '.join(avoid[-60:]) or 'none'}.")
+    out = _ask_json(prompt)
+    if not out:
+        return None
+    out = out[:len(slots)]
+    for q, (_, _, t) in zip(out, slots):
+        q["qtype"] = t
+    return out
+
+
+def verify_questions(qs: list[dict]) -> list[dict]:
+    """Second pass: drop questions a reviewer flags as wrong, ambiguous, or generic. Keeps all if the check fails."""
+    p = get_provider()
+    if not p.available() or not qs:
+        return qs
+    try:
+        raw = p.chat("You are a strict reviewer of life-science quiz questions. For each numbered question, check that "
+                     "the marked answer is correct, the other three are clearly wrong, and it tests real reasoning. "
+                     "Reply JSON only: {\"bad\": [numbers of questions that are wrong, ambiguous or generic]}.",
+                     "\n\n".join(f"{i}. {q['question']} Options: {q['options']}. Marked answer index: {q['answer_index']}. "
+                                  f"Explanation: {q['explanation']}" for i, q in enumerate(qs)), json_mode=True)
+        bad = {int(i) for i in _extract_json(raw).get("bad", [])}
+        return [q for i, q in enumerate(qs) if i not in bad]
+    except Exception:
+        return qs

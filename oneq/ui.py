@@ -899,7 +899,9 @@ LIVE_JS = """
     if (svg) { svg.dataset.react = 'think'; }
     if (line && v.trim().length < 3) { line.textContent = hero.dataset.typing; return; }
     hero._rt = setTimeout(() => {
-      const hit = rules.find(r => r[0].some(k => v.includes(k))) || [[], hero.dataset.fallback, 'happy'];
+      const known = rules.find(r => r[0].some(k => v.includes(k)));
+      const raw = inp.value.trim().slice(0, 40), nice = raw.charAt(0).toUpperCase() + raw.slice(1);
+      const hit = known || [[], nice + ', nice! ' + hero.dataset.fallback, 'happy'];
       if (line) { line.textContent = hit[1]; line.parentElement.classList.remove('pop'); void line.offsetWidth; line.parentElement.classList.add('pop'); }
       if (svg) { svg.dataset.react = hit[2] === 'cheering' ? 'joy' : 'think'; svg.classList.remove('react'); void svg.getBBox(); svg.classList.add('react');
         svg.classList.add('talking'); setTimeout(() => svg.classList.remove('talking'), 900); }

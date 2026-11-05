@@ -564,6 +564,14 @@ def role_reaction(role: str | None) -> tuple[str, str]:
     return ROLE_REACT[fn]
 
 
+def role_unmatched(role: str | None) -> bool:
+    """True when no keyword rule knows this title, so the mascot should repeat it back."""
+    from . import persona
+    r = f" {(role or '').strip().lower()} "
+    return not (any(k in r for k in (" ceo ", "chief executive", "founder", " cto ", "chief technology", "intern", "student", "trainee"))
+                or persona._rule(r, persona.FUNCTION_RULES))
+
+
 def role_react_js_rules() -> list:
     """Same rules, serialised for the browser: [[keywords], line, expression] in priority order."""
     from . import persona

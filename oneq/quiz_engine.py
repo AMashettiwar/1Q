@@ -129,6 +129,44 @@ def _twist_fallback(q: dict, rng: random.Random) -> dict:
     return shuffle_options(t, rng)
 
 
+ROLE_QUESTIONS = 4
+PROCESS_TYPES = ["why", "when", "where", "how", "what"]
+
+
+def _role_questions(u: User, slots: list[tuple[str, int]], seen: set[str], rng: random.Random) -> list[dict]:
+    """Role-specific why/when/where/how/what questions. Empty when no LLM or nothing passes the check."""
+    from . import persona
+    prof = persona.profile(u.role)
+    types = [PROCESS_TYPES[i % 5] if i else "why" for i in range(len(slots))]
+    rng.shuffle(types)
+    types[0] = "why"  # the "why" question is the heart of this
+    rslots = [(sub, lvl, t) for (sub, lvl), t in zip(slots, types)]
+    gen = llm.generate_role_questions(u.role, prof["function"], prof["seniority"], rslots, list(SUBTOPICS), sorted(seen))
+    if not gen:
+        return []
+    out = []
+    for q in llm.verify_questions(gen):
+        if q["subtopic"] not in SUBTOPICS or q["concept_id"] in seen:
+            continue
+        q["concept_id"] = f"role-{q.get('qtype') or 'why'}-{q['concept_id']}"[:120]
+        out.append(q)
+    return out
+
+
+def process_stats(s, u: User) -> list[dict]:
+    """Right/total per question type (why, when, ...) for role questions, derived from concept ids."""
+    rows = s.execute(select(Answer.concept_id, Answer.correct).where(
+        Answer.user_id == u.id, Answer.concept_id.like("role-%"))).all()
+    agg: dict[str, list[int]] = {}
+    for cid, ok in rows:
+        t = cid.split("-")[1] if cid.count("-") >= 2 else "why"
+        a = agg.setdefault(t, [0, 0])
+        a[1] += 1
+        a[0] += int(bool(ok))
+    return [{"type": t.capitalize(), "correct": agg[t][0], "total": agg[t][1],
+             "pct": round(100 * agg[t][0] / agg[t][1])} for t in PROCESS_TYPES if t in agg]
+
+
 def build_daily_set(s, u: User, today: date, n: int = DEFAULT_COUNT, rng: random.Random | None = None) -> list[dict]:
     rng = rng or random.Random(f"{u.id}-{today}")
     due = s.scalars(select(ReviewItem).where(ReviewItem.user_id == u.id, ReviewItem.retired.is_(False),
@@ -154,8 +192,11 @@ def build_daily_set(s, u: User, today: date, n: int = DEFAULT_COUNT, rng: random
         slots = slots[:-3] + [(sub, min(5, lv + 1)) for sub, lv in slots[-3:]]
 
     seen = set(_seen_concepts(s, u)) | {q["concept_id"] for q in out}
-    gen = llm.generate_questions(slots, sorted(seen)) or []
-    for i, (sub, lvl) in enumerate(slots):
+    n_role = min(ROLE_QUESTIONS, len(slots)) if (u.role or "").strip() and not boss else 0
+    role_qs = _role_questions(u, slots[len(slots) - n_role:], seen, rng) if n_role else []
+    slots_gen = slots[:len(slots) - len(role_qs)]
+    gen = llm.generate_questions(slots_gen, sorted(seen)) or []
+    for i, (sub, lvl) in enumerate(slots_gen):
         q = gen[i] if i < len(gen) else None
         if q is None or q["concept_id"] in seen:
             q = seed_for(sub, lvl, seen, rng)
@@ -163,6 +204,10 @@ def build_daily_set(s, u: User, today: date, n: int = DEFAULT_COUNT, rng: random
         q["kind"] = "boss" if boss and i >= len(slots) - 3 else "new"
         seen.add(q["concept_id"])
         out.append(q)
+    for q in role_qs:
+        q["kind"] = "role"
+        seen.add(q["concept_id"])
+        out.append(shuffle_options(q, rng))
     if rng.random() < 0.2 and out:  # wild card day: one slot becomes a surprise topic, same total count
         j = len(out) - 1
         if out[j]["kind"] == "new":
@@ -393,7 +438,7 @@ def progress(s, u: User) -> dict:
     days = s.scalars(select(DailySet.day).where(DailySet.user_id == u.id, DailySet.completed.is_(True))).all()
     reviews = s.scalar(select(func.count()).select_from(ReviewItem).where(
         ReviewItem.user_id == u.id, ReviewItem.retired.is_(False)))
-    return {"topics": topics, "days": sorted(days), "pending_reviews": reviews or 0, **history(s, u)}
+    return {"topics": topics, "days": sorted(days), "pending_reviews": reviews or 0, "process": process_stats(s, u), **history(s, u)}
 
 
 def history(s, u: User, today: date | None = None, span: int = 84) -> dict:

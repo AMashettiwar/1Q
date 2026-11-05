@@ -370,3 +370,32 @@ def test_banks_wide_enough():
     from oneq import avatar
     assert all(len(v) >= 4 for v in avatar.TOPIC_QUIPS.values())
     assert len(avatar.ASK_LINES) >= 20 and len(avatar.HINTS) >= 12
+
+
+def test_role_questions_mixed_into_daily_set_and_scored(db):
+    class Fake(llm.Provider):
+        n = 0
+        def available(self): return True
+        def chat(self, system, user, json_mode=False):
+            if "strict reviewer" in system:
+                return json.dumps({"bad": []})
+            Fake.n += 1
+            qs = [{"concept_id": f"c{Fake.n}-{i}", "subtopic": "genomics", "level": 2, "type": "mcq",
+                   "question": f"Why do we run a negative control in IHC, case {Fake.n}-{i}?",
+                   "options": ["a", "b", "c", "d"], "answer_index": 1, "explanation": "Because reasons here."} for i in range(12)]
+            return json.dumps({"questions": qs})
+    llm.set_provider(Fake())
+    try:
+        with db() as s:
+            u = _user(s, role="IHC technician")
+            qs = qe.build_daily_set(s, u, date(2026, 11, 3))  # a Tuesday: no boss round
+            assert len(qs) == qe.DEFAULT_COUNT
+            role = [q for q in qs if q["kind"] == "role"]
+            assert len(role) == qe.ROLE_QUESTIONS
+            assert all(q["concept_id"].startswith("role-") for q in role)
+            assert any(q["concept_id"].startswith("role-why-") for q in role)
+            qe.record_answer(s, u, role[0], role[0]["answer_index"], D)
+            s.flush()
+            assert qe.process_stats(s, u)[0]["total"] == 1
+    finally:
+        llm.set_provider(None)
