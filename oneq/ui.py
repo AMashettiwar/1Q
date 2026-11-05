@@ -718,14 +718,15 @@ body:has(section[data-testid="stSidebar"][data-collapsed="false"]) .st-key-fab {
 .st-key-prog [data-testid="stVerticalBlockBorderWrapper"]:has(.oq-pcard) { height:100%; }
 .st-key-prog [class*="st-key-pc_"] { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px 12px; box-shadow:var(--shadow); height:100%; }
 .st-key-prog [data-testid="stHorizontalBlock"] { gap:20px !important; margin-bottom:20px; align-items:stretch; }
-.st-key-prog .oq-radar svg { max-width:100%; max-height:266px; margin:0 auto; display:block; }
+.st-key-prog .oq-radar svg { max-width:100%; max-height:350px; margin:0 auto; display:block; }
 .st-key-prog [data-testid="stColumn"] { display:flex; flex-direction:column; }
 .st-key-prog [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { flex:1; display:flex; flex-direction:column; }
 .st-key-prog [data-testid="stColumn"] [class*="st-key-pc_"] { flex:1; box-sizing:border-box; }
-.st-key-prog .st-key-pc_cal { justify-content:center; }
+.st-key-prog .st-key-pc_cal { justify-content:flex-start; }
+.st-key-prog .st-key-pc_cal .oq-heat { margin-top:34px; }
 .st-key-prog [class*="st-key-pc_"] { margin-bottom:20px; }
-.st-key-prog [data-testid="stHorizontalBlock"] [class*="st-key-pc_"] { margin-bottom:0; min-height:345px; }
-.st-key-prog .st-key-pc_radar, .st-key-prog .st-key-pc_cal { height:322px !important; min-height:322px !important; box-sizing:border-box !important; }
+.st-key-prog [data-testid="stHorizontalBlock"] [class*="st-key-pc_"] { margin-bottom:0; min-height:410px; }
+.st-key-prog .st-key-pc_radar, .st-key-prog .st-key-pc_cal { height:410px !important; min-height:410px !important; box-sizing:border-box !important; }
 .st-key-prog [class*="st-key-pc_"] [data-testid="stVegaLiteChart"], .st-key-prog [class*="st-key-pc_"] .oq-radar,
 .st-key-prog [class*="st-key-pc_"] .oq-chart, .st-key-prog [class*="st-key-pc_"] .oq-heat { background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important; }
 .st-key-prog [class*="st-key-pc_"] > div:first-child, .st-key-prog [class*="st-key-pc_"] .oq-h { margin:0 0 8px !important; padding-top:0 !important; }
@@ -1105,7 +1106,7 @@ def radar(topics: list[dict], theme: str = DEFAULT_THEME, size: int = 380) -> st
     pt = lambda i, v: (c + R * v / vmax * math.sin(2 * math.pi * i / n), c - R * v / vmax * math.cos(2 * math.pi * i / n))
     rings = "".join(f'<polygon points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, lv) for i in range(n)))}" '
                     f'fill="none" stroke="{t["line"]}" stroke-width="1"/>' for lv in [vmax * f for f in (.2, .4, .6, .8, 1)])
-    spokes = "".join(f'<line x1="{c}" y1="{c}" x2="{pt(i, 5)[0]:.1f}" y2="{pt(i, 5)[1]:.1f}" stroke="{t["line"]}"/>' for i in range(n))
+    spokes = "".join(f'<line x1="{c}" y1="{c}" x2="{pt(i, vmax)[0]:.1f}" y2="{pt(i, vmax)[1]:.1f}" stroke="{t["line"]}"/>' for i in range(n))
     shape = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, d["level"]) for i, d in enumerate(topics)))
     teal = tone("teal", theme)
     dots, labels = "", ""
@@ -1122,7 +1123,7 @@ def radar(topics: list[dict], theme: str = DEFAULT_THEME, size: int = 380) -> st
         y0 = ly + 5 - 9.5 * (len(ls) - 1)
         labels += (f'<text x="{lx:.1f}" y="{y0:.1f}" text-anchor="{anchor}" font-size="17" font-weight="600" fill="{t["ink"]}">{esc(ls[0])}'
                    + "".join(f'<tspan x="{lx:.1f}" dy="19">{esc(l)}</tspan>' for l in ls[1:]) + "</text>")
-    return (f'<div class="oq-chart oq-radar"><svg viewBox="-95 -20 {size + 190} {size + 40}" width="100%" role="img" '
+    return (f'<div class="oq-chart oq-radar"><svg viewBox="-95 -14 {size + 190} {size + 22}" width="100%" role="img" '
             f'aria-label="Topic mastery radar">{rings}{spokes}'
             f'<polygon class="oq-rshape" points="{shape}" fill="{teal}" fill-opacity=".18" stroke="{teal}" stroke-width="2" '
             f'stroke-linejoin="round"/>{dots}{labels}</svg></div>')
